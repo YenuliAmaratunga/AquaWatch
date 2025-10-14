@@ -21,6 +21,7 @@ import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useNavigation } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
+
 const AUTH_BASE =
   "https://2b55f8fb-4fda-40b3-9a62-9282bf78e6c0-dev.e1-us-east-azure.choreoapis.dev/aquawatch/registration-service/v1.0";
 
@@ -40,8 +41,9 @@ export default function RegisterBoatScreen() {
   const [license, setLicense] = useState(null);
   const [loading, setLoading] = useState(false);
 
+  // 🟢 Load auth & request permissions
   useEffect(() => {
-    const loadAuthData = async () => {
+    const init = async () => {
       try {
         const storedAuth = await AsyncStorage.getItem("authData");
         if (storedAuth) {
@@ -49,47 +51,79 @@ export default function RegisterBoatScreen() {
           setToken(parsed.token);
           setUserId(parsed.userId);
         }
+
+        const { status: mediaStatus } =
+          await ImagePicker.requestMediaLibraryPermissionsAsync();
+        const { status: cameraStatus } =
+          await ImagePicker.requestCameraPermissionsAsync();
+
+        if (mediaStatus !== "granted" || cameraStatus !== "granted") {
+          Alert.alert(
+            "Permissions required",
+            "Please grant camera and gallery access from settings."
+          );
+        }
       } catch (err) {
-        console.log("Error reading authData", err);
+        console.log("Init error:", err);
       }
     };
-    loadAuthData();
+    init();
   }, []);
 
-  const pickImage = async () => {
+  const pickFromGallery = async () => {
+  try {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
-      quality: 1,
+      quality: 0.8,
     });
-    if (!result.canceled) {
-      setImages((prev) => [...prev, result.assets[0].uri]);
-    }
-  };
 
-  const takePhoto = async () => {
+    if (result && !result.canceled && result.assets && result.assets.length > 0) {
+      const selected = result.assets[0].uri;
+      setImages((prev) => [...prev, selected]);
+    }
+  } catch (error) {
+    console.error("Gallery picker error:", error);
+    Alert.alert("Error", "Something went wrong while picking the image.");
+  }
+};
+
+const takePhoto = async () => {
+  try {
     const result = await ImagePicker.launchCameraAsync({
       allowsEditing: true,
-      quality: 1,
+      quality: 0.8,
     });
-    if (!result.canceled) {
-      setImages((prev) => [...prev, result.assets[0].uri]);
-    }
-  };
 
-  const pickLicense = async () => {
+    if (result && !result.canceled && result.assets && result.assets.length > 0) {
+      const selected = result.assets[0].uri;
+      setImages((prev) => [...prev, selected]);
+    }
+  } catch (error) {
+    console.error("Camera capture error:", error);
+    Alert.alert("Error", "Something went wrong while taking a photo.");
+  }
+};
+
+const pickLicense = async () => {
+  try {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
-      quality: 1,
+      quality: 0.8,
     });
-    if (!result.canceled) {
-      setLicense(result.assets[0].uri);
+
+    if (result && !result.canceled && result.assets && result.assets.length > 0) {
+      const selected = result.assets[0].uri;
+      setLicense(selected);
     }
-  };
+  } catch (error) {
+    console.error("License picker error:", error);
+    Alert.alert("Error", "Something went wrong while selecting the license image.");
+  }
+};
 
-  const removeImage = (uri) => setImages((prev) => prev.filter((img) => img !== uri));
-
+  // 📨 Submit form
   const handleSubmit = async () => {
     try {
       if (!token || !userId) {
@@ -136,25 +170,28 @@ export default function RegisterBoatScreen() {
       Alert.alert("✅ Success", "Boat registered successfully!", [
         {
           text: "OK",
-          onPress: () =>
-            navigation.replace("MainTabs"),
+          onPress: () => navigation.navigate("MainTabs"),
         },
       ]);
     } catch (err) {
-      console.log(err);
-      Alert.alert("Error", "Failed to register boat");
+      console.log("Registration error:", err);
+      Alert.alert("Error", "Failed to register boat.");
     } finally {
       setLoading(false);
     }
   };
 
+  // 🧱 UI
   return (
     <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        style={{ flex: 1 }}
+      >
         <ScrollView contentContainerStyle={{ padding: 20 }}>
           <Text style={styles.headerTitle}>🚤 Register Your Boat</Text>
 
-          {/* Card 1 */}
+          {/* Basic Info */}
           <View style={styles.card}>
             <Text style={styles.sectionTitle}>Basic Information</Text>
             <TextInput
@@ -163,19 +200,31 @@ export default function RegisterBoatScreen() {
               value={boatName}
               onChangeText={setBoatName}
             />
-            <Picker selectedValue={boatType} onValueChange={setBoatType} style={styles.picker}>
+            <Picker
+              selectedValue={boatType}
+              onValueChange={setBoatType}
+              style={styles.picker}
+            >
               <Picker.Item label="Select Boat Type" value="" />
               <Picker.Item label="Trawler" value="Trawler" />
               <Picker.Item label="Longliner" value="Longliner" />
               <Picker.Item label="Gillnetter" value="Gillnetter" />
             </Picker>
-            <Picker selectedValue={engineType} onValueChange={setEngineType} style={styles.picker}>
+            <Picker
+              selectedValue={engineType}
+              onValueChange={setEngineType}
+              style={styles.picker}
+            >
               <Picker.Item label="Select Engine Type" value="" />
               <Picker.Item label="Diesel" value="Diesel" />
               <Picker.Item label="Petrol" value="Petrol" />
               <Picker.Item label="Outboard" value="Outboard" />
             </Picker>
-            <Picker selectedValue={homePort} onValueChange={setHomePort} style={styles.picker}>
+            <Picker
+              selectedValue={homePort}
+              onValueChange={setHomePort}
+              style={styles.picker}
+            >
               <Picker.Item label="Select Home Port" value="" />
               <Picker.Item label="Colombo" value="Colombo" />
               <Picker.Item label="Galle" value="Galle" />
@@ -183,7 +232,7 @@ export default function RegisterBoatScreen() {
             </Picker>
           </View>
 
-          {/* Card 2 */}
+          {/* Registration */}
           <View style={styles.card}>
             <Text style={styles.sectionTitle}>Registration & Specs</Text>
             <TextInput
@@ -214,12 +263,11 @@ export default function RegisterBoatScreen() {
             />
           </View>
 
-          {/* Card 3 */}
+          {/* Images */}
           <View style={styles.card}>
             <Text style={styles.sectionTitle}>Images</Text>
-
             <View style={styles.buttonRow}>
-              <Pressable style={styles.uploadBtn} onPress={pickImage}>
+              <Pressable style={styles.uploadBtn} onPress={pickFromGallery}>
                 <Text style={styles.uploadText}>📁 From Gallery</Text>
               </Pressable>
               <Pressable style={styles.uploadBtn} onPress={takePhoto}>
@@ -227,11 +275,14 @@ export default function RegisterBoatScreen() {
               </Pressable>
             </View>
 
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 10 }}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               {images.map((uri, i) => (
                 <View key={i} style={styles.imageWrapper}>
                   <Image source={{ uri }} style={styles.image} />
-                  <Pressable style={styles.removeBtn} onPress={() => removeImage(uri)}>
+                  <Pressable
+                    style={styles.removeBtn}
+                    onPress={() => removeImage(uri)}
+                  >
                     <Text style={{ color: "white" }}>✕</Text>
                   </Pressable>
                 </View>
@@ -242,21 +293,32 @@ export default function RegisterBoatScreen() {
             <Pressable style={styles.uploadBtn} onPress={pickLicense}>
               <Text style={styles.uploadText}>📄 Upload License</Text>
             </Pressable>
-             {license ? (
-  <View style={[styles.imageWrapper, { marginTop: 10 }]}>
-    <Image source={{ uri: license }} style={[styles.image, { width: 300, height: 160 }]} />
-    <Pressable
-      style={[styles.removeBtn, { top: -4, right: -4 }]}
-      onPress={() => setLicense(null)}
-    >
-      <Text style={{ color: "white", fontWeight: "700" }}>✕</Text>
-    </Pressable>
-  </View>
-) : null}
+
+            {license && (
+              <View style={[styles.imageWrapper, { marginTop: 10 }]}>
+                <Image
+                  source={{ uri: license }}
+                  style={[styles.image, { width: 300, height: 160 }]}
+                />
+                <Pressable
+                  style={[styles.removeBtn, { top: -4, right: -4 }]}
+                  onPress={() => setLicense(null)}
+                >
+                  <Text style={{ color: "white", fontWeight: "700" }}>✕</Text>
+                </Pressable>
+              </View>
+            )}
           </View>
 
-          <TouchableOpacity onPress={handleSubmit} activeOpacity={0.8} style={{ marginTop: 20 }}>
-            <LinearGradient colors={["#2563EB", "#1E3A8A"]} style={styles.submitBtn}>
+          <TouchableOpacity
+            onPress={handleSubmit}
+            activeOpacity={0.8}
+            style={{ marginTop: 20 }}
+          >
+            <LinearGradient
+              colors={["#2563EB", "#1E3A8A"]}
+              style={styles.submitBtn}
+            >
               <Text style={styles.submitText}>Register Boat</Text>
             </LinearGradient>
           </TouchableOpacity>

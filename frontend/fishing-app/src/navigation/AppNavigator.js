@@ -28,7 +28,9 @@ import PoliceDashboard from "../screens/PoliceDashboard";
 import ReportHubScreen from "../screens/ReportHubScreen";
 import ReportTypePicker from "../screens/ReportTypePicker";
 import MyReports from "../screens/MyReports";
-
+import BoatTabsScreen from "../screens/BoatTabsScreen";
+import BoatListScreen from "../screens/BoatListScreen";
+import BoatDetailsScreen from "../screens/BoatDetailsScreen";
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -88,6 +90,11 @@ export default function AppNavigator() {
         <Stack.Screen name="RegisterBoat" component={RegisterBoatScreen} />
         <Stack.Screen name="TripRegistration" component={TripRegistrationScreen} />
         <Stack.Screen name = "Fisherman" component={FishermanLandingScreen}/>
+        <Stack.Screen name = "Boat" component={BoatTabsScreen}/>
+        <Stack.Screen name="BoatListScreen" component={BoatListScreen} />
+      <Stack.Screen name="BoatDetailsScreen" component={BoatDetailsScreen} />
+
+        
       </Stack.Navigator>
     </NavigationContainer>
   );

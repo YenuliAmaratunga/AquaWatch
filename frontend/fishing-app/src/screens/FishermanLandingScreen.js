@@ -1,13 +1,12 @@
 import React from "react";
-import { View, Text, TouchableOpacity ,ScrollView} from "react-native";
+import { View, Text, TouchableOpacity, ScrollView, Image, Platform } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 export default function FishermanLandingScreen() {
   const navigation = useNavigation();
   const route = useRoute();
-  // const { language, token,userId} = route.params;
-  const language = 'en';
+  const language = "en";
 
   const translations = {
     si: {
@@ -39,42 +38,111 @@ export default function FishermanLandingScreen() {
     },
   };
 
+  const icons = {
+    boat: "sail-boat",
+    trip: "map",
+    safe: "shield-alert",
+    com: "account-group",
+    gear: "compass",
+    license: "file-document",
+  };
+
+  const cardStyle = {
+    backgroundColor: "white",
+    padding: 20,
+    borderRadius: 16,
+    width: "48%",
+    marginBottom: 16,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.2,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 5,
+      },
+    }),
+  };
+
   return (
-    <View className="flex-1 bg-white pt-24">
-      {/* Scrollable content */}
+    <View className="flex-1 bg-white">
+      {/* ---------- HEADER ---------- */}
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          paddingHorizontal: 16,
+          paddingVertical: 35,
+          backgroundColor: "white",
+          ...Platform.select({
+            ios: {
+              shadowColor: "#000",
+              shadowOpacity: 0.1,
+              shadowRadius: 3,
+              shadowOffset: { width: 0, height: 2 },
+            },
+            android: {
+              elevation: 4,
+            },
+          }),
+        }}
+      >
+        <View style={{ flex: 1, alignItems: "center" }}>
+          <Text style={{ fontSize: 18, fontWeight: "bold" }}>
+            Fisherman's Hub
+          </Text>
+        </View>
+
+        {/* Right corner icons */}
+        <View style={{ position: "absolute", right: 16, flexDirection: "row", alignItems: "center" }}>
+          <TouchableOpacity onPress={() => alert("Notifications")}>
+            <MaterialCommunityIcons name="bell-outline" size={26} color="#1E90FF" />
+          </TouchableOpacity>
+
+          <TouchableOpacity onPress={() => alert("Profile")} style={{ marginLeft: 12 }}>
+            <Image
+              source={{
+                uri: "https://cdn-icons-png.flaticon.com/512/4140/4140048.png", // sketch-style avatar
+              }}
+              style={{ width: 32, height: 32, borderRadius: 16 }}
+            />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* ---------- MAIN CONTENT ---------- */}
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
         <Text className="text-xl font-bold mb-4">{translations[language].quick}</Text>
 
         <View className="flex-row flex-wrap justify-between">
-          {/* Cards */}
-          {["boat","trip","safe","com","gear","license"].map((key, index) => (
-            <TouchableOpacity key={index} className="w-[48%] bg-white p-6 rounded-2xl mb-4 shadow"  onPress={() => {
-        if (key === "boat") {
-          navigation.navigate("RegisterBoat");
-        }
-
-        if(key == 'trip'){
-
-          navigation.navigate("TripRegistration");
-        }
-
-        if(key == 'gear'){
-
-          navigation.navigate("Compass");
-        }
-        // Add other navigation for other cards if needed
-      }}>
+          {["boat", "trip", "safe", "com", "gear", "license"].map((key, index) => (
+            <TouchableOpacity
+              key={index}
+              style={cardStyle}
+              activeOpacity={0.8}
+              onPress={() => {
+                if (key === "boat") navigation.navigate("Boat");
+                if (key === "trip") navigation.navigate("TripRegistration");
+                if (key === "gear") navigation.navigate("Compass");
+              }}
+            >
               <View className="items-center">
-                <Text className="text-3xl">
-                  {key === "boat" ? "⛵" : key === "trip" ? "🗺️" : key === "safe" ? "🛡️" : key === "com" ? "👥" : key === "gear" ? "🧭" : "📄"}
+                <MaterialCommunityIcons
+                  name={icons[key]}
+                  size={38}
+                  color="#1E90FF"
+                />
+                <Text className="mt-2 text-gray-700 font-medium text-center">
+                  {translations[language][key]}
                 </Text>
-                <Text className="mt-2 text-gray-700 font-medium text-center">{translations[language][key]}</Text>
               </View>
             </TouchableOpacity>
           ))}
         </View>
       </ScrollView>
-
     </View>
   );
 }
