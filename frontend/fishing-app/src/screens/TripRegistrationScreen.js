@@ -40,7 +40,6 @@ export default function TripRegistrationScreen() {
   const [heading, setHeading] = useState(0);
   const [loading, setLoading] = useState(false);
 
-  // Fetch auth data and current location
   useEffect(() => {
     const init = async () => {
       try {
@@ -62,7 +61,6 @@ export default function TripRegistrationScreen() {
     init();
   }, []);
 
-  // Magnetometer subscription
   useEffect(() => {
     let subscription;
     let lastAngle = null;
@@ -87,7 +85,6 @@ export default function TripRegistrationScreen() {
     };
   }, []);
 
-  // Fetch boats after fishermanId is set
   useEffect(() => {
     const getBoats = async () => {
       if (!fishermanId) return;
@@ -104,7 +101,6 @@ export default function TripRegistrationScreen() {
     getBoats();
   }, [fishermanId]);
 
-  // Get current location
   const getCurrentLocation = async () => {
     try {
       const permission = await Location.requestForegroundPermissionsAsync();
@@ -127,7 +123,6 @@ export default function TripRegistrationScreen() {
     }
   };
 
-  // Check boat capacity
   const checkCapacity = (text) => {
     setNumberOfFisherman(text);
 
@@ -234,27 +229,28 @@ export default function TripRegistrationScreen() {
   };
 
   return (
-    <ScrollView
-      contentContainerStyle={{
-        padding: 15,
-        backgroundColor: "#F7F7F7",
-        paddingTop: 50,
-      }}
-    >
-      {/* ---------- TRIP DETAILS CARD ---------- */}
+    <ScrollView contentContainerStyle={{ padding: 20, paddingTop: 50 }}>
+      {/* ---------- HEADER ---------- */}
+      <Text style={styles.screenTitle}>Trip Registration</Text>
+      <View style={styles.divider} />
+
+      {/* ---------- TRIP DETAILS ---------- */}
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Trip Details</Text>
+        <Text style={styles.sectionTitle}>Trip Details</Text>
 
         <Text style={styles.label}>Select Boat</Text>
-        <Picker
-          selectedValue={selectedBoat}
-          onValueChange={(val) => setSelectedBoat(val)}
-        >
-          <Picker.Item label="-- Select a Boat --" value="" />
-          {boats.map((boat) => (
-            <Picker.Item key={boat._id} label={boat.boatName} value={boat._id} />
-          ))}
-        </Picker>
+        <View style={styles.dropdown}>
+          <Picker
+            selectedValue={selectedBoat}
+            onValueChange={(val) => setSelectedBoat(val)}
+            style={styles.picker}
+          >
+            <Picker.Item label="-- Select a Boat --" value="" />
+            {boats.map((boat) => (
+              <Picker.Item key={boat._id} label={boat.boatName} value={boat._id} />
+            ))}
+          </Picker>
+        </View>
 
         <Text style={styles.label}>Number of Fishermen</Text>
         <TextInput
@@ -283,41 +279,32 @@ export default function TripRegistrationScreen() {
           onPress={handleSubmit}
           disabled={loading}
         >
-          {loading && <ActivityIndicator color="#fff" style={{ marginRight: 8 }} />}
-          <Text style={styles.buttonText}>
-            {loading ? "Registering..." : "Register Trip"}
-          </Text>
+          {loading ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.buttonText}>Register Trip</Text>
+          )}
         </TouchableOpacity>
       </View>
 
-      {/* ---------- MAP + COMPASS CARD ---------- */}
+      {/* ---------- MAP + COMPASS ---------- */}
       <View style={styles.card}>
-        <Text style={styles.cardSubtitle}>Current Location</Text>
+        <Text style={styles.sectionTitle}>Location & Heading</Text>
 
-        <MapView
-          style={styles.map}
-          region={location}
-        >
-          <Marker
-            coordinate={location}
-            draggable
-            onDragEnd={(e) =>
-              setLocation((prev) => ({
-                ...prev,
-                latitude: e.nativeEvent.coordinate.latitude,
-                longitude: e.nativeEvent.coordinate.longitude,
-              }))
-            }
-          />
+        <MapView style={styles.map} region={location}>
+          <Marker coordinate={location} draggable />
         </MapView>
 
-        <Text style={styles.cardSubtitle}>Compass & Heading</Text>
-        <View style={styles.compassContainer}>
-          <Image
-            source={require("../assets/arrow.png")}
-            style={[styles.compassImage, { transform: [{ rotate: `${heading}deg` }] }]}
-            resizeMode="contain"
-          />
+        <View style={styles.compassOuter}>
+          <View style={styles.compassInner}>
+            <Image
+              source={require("../assets/arrow.png")}
+              style={[
+                styles.arrow,
+                { transform: [{ rotate: `${heading}deg` }] },
+              ]}
+            />
+          </View>
         </View>
         <Text style={styles.headingText}>
           {heading ? `${heading.toFixed(0)}° N` : "No Heading"}
@@ -328,26 +315,101 @@ export default function TripRegistrationScreen() {
 }
 
 const styles = StyleSheet.create({
+  screenTitle: {
+    fontSize: 22,
+    fontWeight: "bold",
+    textAlign: "center",
+    marginBottom: 5,
+  },
+  divider: {
+    height: 2,
+    backgroundColor: "#ccc",
+    width: "40%",
+    alignSelf: "center",
+    marginBottom: 25,
+    borderRadius: 2,
+  },
   card: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 12,
+    backgroundColor: "#fff",
+    borderRadius: 14,
     padding: 20,
+    marginBottom: 25,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    marginBottom: 20,
-    borderWidth: 2,
-    borderColor: "#E5E7EB",
+    shadowOpacity: 0.08,
+    shadowRadius: 5,
+    elevation: 2,
   },
-  cardTitle: { fontSize: 18, fontWeight: "bold", marginBottom: 20 },
-  cardSubtitle: { fontWeight: "bold", fontSize: 15, marginBottom: 10, textAlign: "center", color: "#1F2937" },
-  label: { fontWeight: "500", marginTop: 10 },
-  input: { borderWidth: 1, borderColor: "#ccc", borderRadius: 6, padding: 8, marginTop: 5 },
-  button: { backgroundColor: "#6366F1", paddingVertical: 12, borderRadius: 8, alignItems: "center", marginTop: 20, flexDirection: "row", justifyContent: "center" },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#222",
+    marginBottom: 15,
+  },
+  label: {
+    fontWeight: "500",
+    color: "#444",
+    marginTop: 10,
+  },
+  dropdown: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 8,
+    marginTop: 5,
+  },
+  picker: {
+    height: 48,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 8,
+    padding: 10,
+    marginTop: 5,
+  },
+  button: {
+    backgroundColor: "#0066cc",
+    paddingVertical: 13,
+    borderRadius: 8,
+    marginTop: 25,
+    alignItems: "center",
+  },
   buttonText: { color: "white", fontWeight: "bold", fontSize: 16 },
-  map: { height: 200, borderRadius: 8, marginBottom: 15 },
-  compassContainer: { width: 200, height: 200, alignSelf: "center", justifyContent: "center", alignItems: "center" },
-  compassImage: { width: 200, height: 200 },
-  headingText: { textAlign: "center", fontWeight: "bold", fontSize: 20 },
+  map: {
+    height: 220,
+    borderRadius: 12,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: "#ddd",
+  },
+  compassOuter: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    borderWidth: 2,
+    borderColor: "#ccc",
+    justifyContent: "center",
+    alignItems: "center",
+    alignSelf: "center",
+    marginVertical: 10,
+  },
+  compassInner: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: "#f9f9f9",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  arrow: {
+    width: 100,
+    height: 100,
+    tintColor: "#007bff",
+  },
+  headingText: {
+    textAlign: "center",
+    fontWeight: "600",
+    fontSize: 16,
+    color: "#333",
+  },
 });

@@ -9,7 +9,7 @@ route.get('/viewAllBoatRequests',authMiddleware,authorizeRoles("admin"),boatCont
 route.get('/findBoatequests',authMiddleware,authorizeRoles("admin"),boatController.statusBasedBoatRegRequests);
 route.put('/updateBoatRegRequestStatus/:id',authMiddleware,authorizeRoles("admin"),boatController.updateBoatRequests);
 route.get('/viewBoatRegRequestsMade/:id',boatController.viewAllBoatRequestsByFisherman);
-router.delete("/delete/:id", boatController.deleteBoat);
+route.delete("/delete/:id", boatController.deleteBoat);
 
 
 
