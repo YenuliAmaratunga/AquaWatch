@@ -170,3 +170,19 @@ exports.viewAllBoatRequestsByFisherman = async (req, res) => {
   }
 };
 
+exports.deleteBoat = async (req, res) => {
+  try {
+    const boatId = req.params.id;
+
+    const deletedBoat = await Boat.findByIdAndDelete(boatId);
+
+    if (!deletedBoat) {
+      return res.status(404).json({ message: "Boat not found" });
+    }
+
+    return res.status(200).json({ message: "Boat deleted successfully" });
+  } catch (err) {
+    console.error("Error deleting boat:", err);
+    return res.status(500).json({ message: "Server error occurred" });
+  }
+};
