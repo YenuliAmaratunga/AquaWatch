@@ -10,6 +10,7 @@ route.get('/findBoatequests',authMiddleware,authorizeRoles("admin"),boatControll
 route.put('/updateBoatRegRequestStatus/:id',authMiddleware,authorizeRoles("admin"),boatController.updateBoatRequests);
 route.get('/viewBoatRegRequestsMade/:id',boatController.viewAllBoatRequestsByFisherman);
 route.delete("/delete/:id", boatController.deleteBoat);
+route.post("/delete/:id",  boatController.deleteBoat); 
 
 
 

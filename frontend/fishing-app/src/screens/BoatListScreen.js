@@ -16,7 +16,7 @@ import { useNavigation } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
 
 const BASE_URL =
-  "https://2b55f8fb-4fda-40b3-9a62-9282bf78e6c0-dev.e1-us-east-azure.choreoapis.dev/aquawatch/registration-service/v1.0";
+  "https://10b8c329-d78f-4b7f-8cd9-448ba1dae2e2-dev.e1-us-east-azure.choreoapis.dev/aquawatchapp/registration-service/v1.0";
 
 export default function BoatListScreen() {
   const [boats, setBoats] = useState([]);
@@ -50,6 +50,8 @@ export default function BoatListScreen() {
         `${BASE_URL}/api/Boat/viewBoatRegRequestsMade/${userId}`
       );
       setBoats(response.data);
+
+
     } catch (error) {
       console.log("Error fetching boats:", error);
     } finally {
@@ -70,28 +72,29 @@ export default function BoatListScreen() {
 
   // ✅ Delete Boat with Alert
   const handleDeleteBoat = (boatId) => {
-    Alert.alert(
-      "Confirm Deletion",
-      "Are you sure you want to delete this boat?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "OK",
-          onPress: async () => {
-            try {
-              await axios.delete(`${BASE_URL}/api/Boat/delete/${boatId}`);
-              Alert.alert("Success", "Boat deleted successfully!");
-              fetchBoats(); // refresh list
-            } catch (error) {
-              console.log("Delete error:", error);
-              Alert.alert("Error", "Failed to delete the boat.");
-            }
-          },
+  Alert.alert(
+    "Confirm Deletion",
+    "Are you sure you want to delete this boat?",
+    [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "OK",
+        onPress: async () => {
+          try {
+            await axios.delete(`${BASE_URL}/api/Boat/delete/${boatId}`);
+            Alert.alert("Success", "Boat deleted successfully!");
+            fetchBoats(); // refresh list
+          } catch (error) {
+            console.log("Delete error:", error.response?.data || error.message);
+            Alert.alert("Error", "Failed to delete the boat.");
+          }
         },
-      ],
-      { cancelable: true }
-    );
-  };
+      },
+    ],
+    { cancelable: true }
+  );
+};
+
 
   if (loading) {
     return (
