@@ -168,7 +168,6 @@ exports.endTrip = async (req, res) => {
   }
 };
 
-
 exports.viewTrip = async (req, res) => {
   try {
     const { tripId } = req.params;
@@ -182,54 +181,159 @@ exports.viewTrip = async (req, res) => {
       return res.status(404).send("<h2>Trip not found or invalid token</h2>");
     }
 
-    // Return dynamic map HTML
+    const participantList = trip.participantIds
+      .map(
+        (p) =>
+          `<li><span class="dot"></span> ${p.name} <span class="id">(${p.nationalId})</span></li>`
+      )
+      .join("");
+
     return res.send(`
       <!DOCTYPE html>
-      <html>
+      <html lang="en">
       <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>Fishing Trip Live View</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+        <!-- Leaflet map -->
         <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
         <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
         <style>
-          body { font-family: Arial; background-color: #eef6fb; margin: 0; padding: 0; }
-          .info { padding: 15px; background: white; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-          #map { height: 500px; width: 100%; }
-          h2 { color: #007bff; }
-          p { margin: 6px 0; }
+          body {
+            font-family: 'Segoe UI', Tahoma, sans-serif;
+            background: linear-gradient(135deg, #dfefff, #b3d8ff);
+            margin: 0;
+            padding: 0;
+            color: #222;
+          }
+
+          .container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            min-height: 100vh;
+            padding: 20px;
+          }
+
+          .card {
+            background: #fff;
+            border-radius: 18px;
+            box-shadow: 0 6px 18px rgba(0,0,0,0.1);
+            max-width: 420px;
+            width: 100%;
+            overflow: hidden;
+            padding: 20px 24px;
+            text-align: left;
+          }
+
+          h2 {
+            color: #007bff;
+            text-align: center;
+            font-size: 22px;
+            margin-bottom: 18px;
+          }
+
+          p {
+            margin: 6px 0;
+            font-size: 15px;
+          }
+
+          ul {
+            list-style: none;
+            padding: 0;
+            margin: 10px 0;
+          }
+
+          li {
+            padding: 6px 0;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            align-items: center;
+          }
+
+          .dot {
+            height: 8px;
+            width: 8px;
+            background-color: #007bff;
+            border-radius: 50%;
+            margin-right: 8px;
+          }
+
+          .id {
+            color: #555;
+            font-size: 13px;
+          }
+
+          #map {
+            height: 320px;
+            width: 100%;
+            border-radius: 12px;
+            margin-top: 15px;
+            box-shadow: 0 3px 8px rgba(0,0,0,0.15);
+          }
+
+          .footer {
+            text-align: center;
+            color: #555;
+            font-size: 13px;
+            margin-top: 12px;
+          }
+
+          @media (max-width: 500px) {
+            .card { padding: 16px; }
+            h2 { font-size: 20px; }
+          }
         </style>
       </head>
+
       <body>
-        <div class="info">
-          <h2>Fishing Trip: ${trip.boat.boatName}</h2>
-          <p><b>Registration:</b> ${trip.boat.registrationNumber}</p>
-          <p><b>Participants:</b> ${trip.numberOfParticipants}</p>
-          <p><b>Heading:</b> ${trip.heading}°</p>
+        <div class="container">
+          <div class="card">
+            <h2>Fishing Trip Details</h2>
+            <p><b>Boat:</b> ${trip.boat.boatName} (${trip.boat.registrationNumber})</p>
+            <p><b>Participants:</b> ${trip.numberOfParticipants}</p>
+            <p><b>Heading:</b> ${trip.heading}°</p>
+            <p><b>Start:</b> ${new Date(trip.startDate).toLocaleString()}</p>
+
+            <p style="margin-top:10px;"><b>Crew Members:</b></p>
+            <ul>${participantList}</ul>
+
+            <div id="map"></div>
+
+            <div class="footer">🌊 AquaWatch | Live Trip View</div>
+          </div>
         </div>
 
-        <div id="map"></div>
-
         <script>
-          const map = L.map('map').setView([${trip.startingLocation.latitude}, ${trip.startingLocation.longitude}], 8);
+          const map = L.map('map').setView(
+            [${trip.startingLocation.latitude}, ${trip.startingLocation.longitude}],
+            8
+          );
+
           L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '© OpenStreetMap contributors'
           }).addTo(map);
 
-          // Starting point
+          // Starting point marker
           L.marker([${trip.startingLocation.latitude}, ${trip.startingLocation.longitude}])
             .addTo(map)
             .bindPopup('Starting Point').openPopup();
 
-          // Get current user (scanner) location
+          // User current location (GPS)
           if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(
               (pos) => {
                 const lat = pos.coords.latitude;
                 const lon = pos.coords.longitude;
-                L.marker([lat, lon], { icon: L.icon({
-                  iconUrl: 'https://cdn-icons-png.flaticon.com/512/684/684908.png',
-                  iconSize: [28, 28],
-                })}).addTo(map).bindPopup('Your Current Location');
+                L.marker([lat, lon], {
+                  icon: L.icon({
+                    iconUrl: 'https://cdn-icons-png.flaticon.com/512/684/684908.png',
+                    iconSize: [28, 28],
+                  }),
+                }).addTo(map).bindPopup('Your Location');
                 map.setView([lat, lon], 10);
               },
               (err) => console.warn("GPS permission denied", err)
