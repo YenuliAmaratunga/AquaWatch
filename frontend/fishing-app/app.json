@@ -16,15 +16,10 @@
         "backgroundColor": "#004675"
       },
       "permissions": [
-        "CAMERA",
-        "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE",
-        "READ_MEDIA_IMAGES",
-        "READ_MEDIA_VIDEO",
-        "READ_MEDIA_AUDIO",
-        "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION"
-      ],
+    "READ_MEDIA_IMAGES",
+    "WRITE_EXTERNAL_STORAGE",
+    "ACCESS_FINE_LOCATION"
+  ],
       "edgeToEdgeEnabled": true,
       "package": "com.anonymous.AquaWatch"
     },

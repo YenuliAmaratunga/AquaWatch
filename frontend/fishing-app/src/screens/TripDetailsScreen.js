@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import {
   View,
   Text,
@@ -6,15 +6,22 @@ import {
   ScrollView,
   ImageBackground,
   ActivityIndicator,
+  TouchableOpacity,
+  Alert,
 } from "react-native";
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Location from "expo-location";
-import QRCode from "react-native-qrcode-svg"; // ✅ ADD THIS IMPORT
+import QRCode from "react-native-qrcode-svg";
+import ViewShot from "react-native-view-shot"; // ✅ MUST import
+import * as FileSystem from "expo-file-system"; // ✅ MUST import
+import * as Sharing from "expo-sharing"; // ✅ MUST import
 
 export default function TripDetailsScreen({ route }) {
   const { trip } = route.params;
   const [startLocationName, setStartLocationName] = useState("");
   const [loadingLocation, setLoadingLocation] = useState(true);
+  const [downloading, setDownloading] = useState(false);
+  const qrViewRef = useRef();
 
   useEffect(() => {
     const fetchLocationName = async () => {
@@ -37,6 +44,36 @@ export default function TripDetailsScreen({ route }) {
     };
     fetchLocationName();
   }, []);
+
+  const handleDownloadQR = async () => {
+    try {
+      setDownloading(true);
+
+      // ✅ Step 1: Capture QR as image
+      const uri = await qrViewRef.current.capture();
+      const fileUri = `${FileSystem.cacheDirectory}trip_qr_${Date.now()}.jpg`;
+      await FileSystem.copyAsync({ from: uri, to: fileUri });
+
+      // ✅ Step 2: Open system share dialog (safe in Expo Go)
+      const canShare = await Sharing.isAvailableAsync();
+      if (!canShare) {
+        Alert.alert("Not Supported", "Sharing is not available on this device.");
+        return;
+      }
+
+      await Sharing.shareAsync(fileUri, {
+        mimeType: "image/jpeg",
+        dialogTitle: "Share or Save Trip QR Code",
+      });
+
+      Alert.alert("✅ Done", "QR code ready to share or save.");
+    } catch (err) {
+      console.error("Error sharing QR:", err);
+      Alert.alert("Error", "Something went wrong while generating the QR.");
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   return (
     <ScrollView style={styles.container}>
@@ -97,15 +134,6 @@ export default function TripDetailsScreen({ route }) {
         )}
       </View>
 
-      {/* 🌤️ WEATHER MOCKUP */}
-      <View style={styles.weatherCard}>
-        <View style={{ flexDirection: "row", alignItems: "center" }}>
-          <MaterialCommunityIcons name="weather-sunny" size={30} color="#f5b700" />
-          <Text style={styles.weatherText}> Calm seas, clear sky </Text>
-        </View>
-        <Text style={styles.weatherSub}>27°C | Light breeze 6 km/h</Text>
-      </View>
-
       {/* 👥 PARTICIPANTS */}
       <View style={styles.participantsCard}>
         <Text style={styles.participantTitle}>Crew Members</Text>
@@ -116,20 +144,33 @@ export default function TripDetailsScreen({ route }) {
         ))}
       </View>
 
-      {/* 🧾 QR CODE SECTION */}
+      {/* 🧾 QR SECTION */}
       <View style={styles.qrCard}>
         <Text style={styles.qrTitle}>Trip QR Code</Text>
         {trip.qrData ? (
-          <QRCode
-            value={trip.qrData}
-            size={180}
-            color="#000"
-            backgroundColor="#fff"
-          />
+          <>
+            <ViewShot ref={qrViewRef} options={{ format: "jpg", quality: 1.0 }}>
+              <QRCode value={trip.qrData} size={180} color="#000" backgroundColor="#fff" />
+            </ViewShot>
+
+            <TouchableOpacity
+              onPress={handleDownloadQR}
+              style={[styles.downloadBtn, downloading && { opacity: 0.7 }]}
+              disabled={downloading}
+            >
+              {downloading ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <>
+                  <Feather name="download" size={18} color="#fff" />
+                  <Text style={styles.downloadText}>Share or Save QR</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </>
         ) : (
           <Text style={styles.noQr}>QR Code not available</Text>
         )}
-        <Text style={styles.qrSubText}>Scan to access trip info securely</Text>
       </View>
     </ScrollView>
   );
@@ -157,15 +198,6 @@ const styles = StyleSheet.create({
   infoRow: { flexDirection: "row", alignItems: "center", marginVertical: 6, gap: 8 },
   label: { fontWeight: "600", color: "#333", flex: 1 },
   value: { color: "#444", flex: 1.5 },
-  weatherCard: {
-    marginHorizontal: 15,
-    backgroundColor: "#e6f0ff",
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 10,
-  },
-  weatherText: { fontSize: 16, fontWeight: "600", color: "#0047ab" },
-  weatherSub: { fontSize: 14, color: "#0047ab", marginLeft: 35 },
   participantsCard: {
     backgroundColor: "#fff",
     margin: 15,
@@ -173,15 +205,8 @@ const styles = StyleSheet.create({
     padding: 16,
     elevation: 4,
   },
-  participantTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#222",
-    marginBottom: 6,
-  },
+  participantTitle: { fontSize: 16, fontWeight: "600", color: "#222", marginBottom: 6 },
   participant: { color: "#555", marginLeft: 10, marginTop: 4 },
-
-  // 🔲 QR Code Section
   qrCard: {
     alignItems: "center",
     justifyContent: "center",
@@ -193,5 +218,15 @@ const styles = StyleSheet.create({
   },
   qrTitle: { fontSize: 18, fontWeight: "700", color: "#007bff", marginBottom: 10 },
   noQr: { color: "#888", marginVertical: 10 },
-  qrSubText: { fontSize: 13, color: "#666", marginTop: 8 },
+  downloadBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#007bff",
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    marginTop: 15,
+    gap: 8,
+  },
+  downloadText: { color: "#fff", fontWeight: "600", fontSize: 14 },
 });

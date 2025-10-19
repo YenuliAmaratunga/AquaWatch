@@ -75,7 +75,7 @@ export default function FishermanLandingScreen() {
           alignItems: "center",
           justifyContent: "space-between",
           paddingHorizontal: 16,
-          paddingVertical: 35,
+          paddingVertical: 70,
           backgroundColor: "white",
           ...Platform.select({
             ios: {

@@ -9,6 +9,8 @@ import {
   ScrollView,
   StyleSheet,
   ActivityIndicator,
+  Platform,
+  ActionSheetIOS,
 } from "react-native";
 import { Picker } from "@react-native-picker/picker";
 import Slider from "@react-native-community/slider";
@@ -19,7 +21,6 @@ import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Feather, MaterialIcons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
-
 
 const AUTH_BASE =
   "https://10b8c329-d78f-4b7f-8cd9-448ba1dae2e2-dev.e1-us-east-azure.choreoapis.dev/aquawatchapp/registration-service/v1.0";
@@ -98,7 +99,6 @@ const alertStyles = StyleSheet.create({
 });
 
 export default function TripRegistrationScreen() {
-
   const navigation = useNavigation();
 
   const [token, setToken] = useState(null);
@@ -277,18 +277,47 @@ export default function TripRegistrationScreen() {
       {/* Boat selection */}
       <View style={styles.card}>
         <Text style={styles.label}>Select Boat</Text>
-        <View style={styles.dropdown}>
-          <Picker
-            selectedValue={selectedBoat}
-            onValueChange={(v) => setSelectedBoat(v)}
-            style={{ height: 50 }}
+
+        {Platform.OS === "ios" ? (
+          <TouchableOpacity
+            style={styles.iosDropdown}
+            onPress={() => {
+              const boatOptions = boats.map((b) => b.boatName);
+              ActionSheetIOS.showActionSheetWithOptions(
+                {
+                  options: ["Cancel", ...boatOptions],
+                  cancelButtonIndex: 0,
+                  userInterfaceStyle: "light",
+                },
+                (index) => {
+                  if (index > 0) {
+                    setSelectedBoat(boats[index - 1]._id);
+                  }
+                }
+              );
+            }}
           >
-            <Picker.Item label="-- Select a Boat --" value="" />
-            {boats.map((b) => (
-              <Picker.Item key={b._id} label={b.boatName} value={b._id} />
-            ))}
-          </Picker>
-        </View>
+            <Text style={styles.iosDropdownText}>
+              {selectedBoat
+                ? boats.find((b) => b._id === selectedBoat)?.boatName
+                : "-- Select a Boat --"}
+            </Text>
+            <Feather name="chevron-down" size={18} color="#555" />
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.dropdown}>
+            <Picker
+              selectedValue={selectedBoat}
+              onValueChange={(v) => setSelectedBoat(v)}
+              style={styles.picker}
+            >
+              <Picker.Item label="-- Select a Boat --" value="" />
+              {boats.map((b) => (
+                <Picker.Item key={b._id} label={b.boatName} value={b._id} />
+              ))}
+            </Picker>
+          </View>
+        )}
 
         {/* Sidebar Fisherman Selector */}
         <Text style={[styles.label, { marginTop: 15 }]}>Number of Fishermen</Text>
@@ -453,18 +482,17 @@ export default function TripRegistrationScreen() {
           <View style={styles.successBox}>
             <Feather name="check-circle" size={70} color="#28a745" />
             <Text style={styles.successTitle}>Trip Registered!</Text>
-           
-           <TouchableOpacity
-  activeOpacity={0.9}
-  style={styles.successOkButton}
-  onPress={() => {
-    setTripSuccess({ ...tripSuccess, visible: false });
-    navigation.replace("Fisherman", { token, userId: fishermanId });
-  }}
->
-  <Text style={styles.successOkText}>OK</Text>
-</TouchableOpacity>
 
+            <TouchableOpacity
+              activeOpacity={0.9}
+              style={styles.successOkButton}
+              onPress={() => {
+                setTripSuccess({ ...tripSuccess, visible: false });
+                navigation.replace("Fisherman", { token, userId: fishermanId });
+              }}
+            >
+              <Text style={styles.successOkText}>OK</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -483,7 +511,7 @@ export default function TripRegistrationScreen() {
 
 // ---------------- Styles ----------------
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f8f9fa", paddingTop : 50 },
+  container: { flex: 1, backgroundColor: "#f8f9fa", paddingTop: 50 },
   title: {
     fontSize: 22,
     fontWeight: "bold",
@@ -507,6 +535,26 @@ const styles = StyleSheet.create({
     borderColor: "#ccc",
     borderRadius: 8,
     marginBottom: 10,
+  },
+  iosDropdown: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 15,
+    backgroundColor: "#fdfdfd",
+    marginBottom: 10,
+  },
+  iosDropdownText: {
+    fontSize: 16,
+    color: "#333",
+  },
+  picker: {
+    height: 50,
+    color: "#333",
   },
   input: {
     borderWidth: 1,
@@ -659,27 +707,18 @@ const styles = StyleSheet.create({
     color: "#28a745",
     marginTop: 15,
   },
-  successMessage: {
-    fontSize: 16,
-    color: "#333",
-    textAlign: "center",
-    marginTop: 10,
-  },
-
   successOkButton: {
-  backgroundColor: "#fff",
-  borderWidth: 2,
-  borderColor: "#28a745",
-  paddingVertical: 8,
-  paddingHorizontal: 26,
-  borderRadius: 25,
-  marginTop: 16,
-},
-successOkText: {
-  color: "#28a745",
-  fontSize: 16,
-  fontWeight: "bold",
-},
-
+    backgroundColor: "#fff",
+    borderWidth: 2,
+    borderColor: "#28a745",
+    paddingVertical: 8,
+    paddingHorizontal: 26,
+    borderRadius: 25,
+    marginTop: 16,
+  },
+  successOkText: {
+    color: "#28a745",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
 });
-
