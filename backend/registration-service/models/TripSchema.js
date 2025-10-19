@@ -22,6 +22,11 @@ const TripSchema = new mongoose.Schema(
       longitude: { type: Number, required: true },
     },
     heading: { type: Number, required: true },
+
+    startDate: { type: Date, required: true, default: Date.now },
+    startTime: { type: String }, 
+    endDate: { type: Date },
+    endTime: { type: String }, 
   },
   {
     timestamps: true, 

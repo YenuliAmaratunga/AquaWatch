@@ -125,7 +125,7 @@ export default function FishermanLandingScreen() {
               activeOpacity={0.8}
               onPress={() => {
                 if (key === "boat") navigation.navigate("Boat");
-                if (key === "trip") navigation.navigate("TripRegistration");
+                if (key === "trip") navigation.navigate("Trips");
                 if (key === "gear") navigation.navigate("Compass");
               }}
             >

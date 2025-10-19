@@ -20,7 +20,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Feather, MaterialIcons } from "@expo/vector-icons";
 
 const AUTH_BASE =
-  "https://2b55f8fb-4fda-40b3-9a62-9282bf78e6c0-dev.e1-us-east-azure.choreoapis.dev/aquawatch/registration-service/v1.0";
+  "https://10b8c329-d78f-4b7f-8cd9-448ba1dae2e2-dev.e1-us-east-azure.choreoapis.dev/aquawatchapp/registration-service/v1.0";
 
 // ---------------- Custom Alert Component ----------------
 const AppAlert = ({ visible, title, message, type = "info", onClose }) => {
@@ -677,3 +677,4 @@ successOkText: {
 },
 
 });
+
