@@ -27,6 +27,11 @@ const TripSchema = new mongoose.Schema(
     startTime: { type: String }, 
     endDate: { type: Date },
     endTime: { type: String }, 
+
+    shareToken: { type: String, allowNull: false, unique: true },
+    qrData: { type: String, allowNull: false },
+    qrGeneratedAt: { type: Date, defaultValue: Date.now },
+    
   },
   {
     timestamps: true, 

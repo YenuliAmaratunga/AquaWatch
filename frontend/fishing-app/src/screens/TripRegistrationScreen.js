@@ -18,6 +18,8 @@ import { Magnetometer } from "expo-sensors";
 import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Feather, MaterialIcons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
+
 
 const AUTH_BASE =
   "https://10b8c329-d78f-4b7f-8cd9-448ba1dae2e2-dev.e1-us-east-azure.choreoapis.dev/aquawatchapp/registration-service/v1.0";
@@ -95,7 +97,10 @@ const alertStyles = StyleSheet.create({
   },
 });
 
-export default function TripRegistrationScreen({ navigation }) {
+export default function TripRegistrationScreen() {
+
+  const navigation = useNavigation();
+
   const [token, setToken] = useState(null);
   const [fishermanId, setFishermanId] = useState("");
   const [boats, setBoats] = useState([]);
