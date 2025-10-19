@@ -168,6 +168,7 @@ exports.endTrip = async (req, res) => {
   }
 };
 
+
 exports.viewTrip = async (req, res) => {
   try {
     const { tripId } = req.params;
@@ -181,30 +182,61 @@ exports.viewTrip = async (req, res) => {
       return res.status(404).send("<h2>Trip not found or invalid token</h2>");
     }
 
-    // 🌐 Return as a nice browser page
+    // Return dynamic map HTML
     return res.send(`
+      <!DOCTYPE html>
       <html>
-        <head>
-          <title>Fishing Trip Details</title>
-          <style>
-            body { font-family: Arial; background-color: #eef6fb; padding: 20px; color: #222; }
-            .card { background: white; border-radius: 12px; padding: 20px; max-width: 420px; margin: auto; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
-            h2 { color: #007bff; text-align: center; }
-            ul { padding-left: 20px; }
-            li { margin: 6px 0; }
-          </style>
-        </head>
-        <body>
-          <div class="card">
-            <h2>Fishing Trip Details</h2>
-            <p><b>Boat:</b> ${trip.boat.boatName} (${trip.boat.registrationNumber})</p>
-            <p><b>Participants:</b> ${trip.numberOfParticipants}</p>
-            <p><b>Heading:</b> ${trip.heading}°</p>
-            <p><b>Start:</b> ${new Date(trip.startDate).toLocaleString()}</p>
-            <p><b>Crew Members:</b></p>
-            <ul>${trip.participantIds.map(p => `<li>${p.name} (${p.nationalId})</li>`).join("")}</ul>
-          </div>
-        </body>
+      <head>
+        <title>Fishing Trip Live View</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+        <style>
+          body { font-family: Arial; background-color: #eef6fb; margin: 0; padding: 0; }
+          .info { padding: 15px; background: white; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+          #map { height: 500px; width: 100%; }
+          h2 { color: #007bff; }
+          p { margin: 6px 0; }
+        </style>
+      </head>
+      <body>
+        <div class="info">
+          <h2>Fishing Trip: ${trip.boat.boatName}</h2>
+          <p><b>Registration:</b> ${trip.boat.registrationNumber}</p>
+          <p><b>Participants:</b> ${trip.numberOfParticipants}</p>
+          <p><b>Heading:</b> ${trip.heading}°</p>
+        </div>
+
+        <div id="map"></div>
+
+        <script>
+          const map = L.map('map').setView([${trip.startingLocation.latitude}, ${trip.startingLocation.longitude}], 8);
+          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+          }).addTo(map);
+
+          // Starting point
+          L.marker([${trip.startingLocation.latitude}, ${trip.startingLocation.longitude}])
+            .addTo(map)
+            .bindPopup('Starting Point').openPopup();
+
+          // Get current user (scanner) location
+          if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+              (pos) => {
+                const lat = pos.coords.latitude;
+                const lon = pos.coords.longitude;
+                L.marker([lat, lon], { icon: L.icon({
+                  iconUrl: 'https://cdn-icons-png.flaticon.com/512/684/684908.png',
+                  iconSize: [28, 28],
+                })}).addTo(map).bindPopup('Your Current Location');
+                map.setView([lat, lon], 10);
+              },
+              (err) => console.warn("GPS permission denied", err)
+            );
+          }
+        </script>
+      </body>
       </html>
     `);
   } catch (error) {
