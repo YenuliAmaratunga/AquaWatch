@@ -6,6 +6,7 @@ import {
   FlatList,
   ActivityIndicator,
   StyleSheet,
+  Alert,
 } from "react-native";
 import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -16,11 +17,10 @@ const AUTH_BASE =
   "https://10b8c329-d78f-4b7f-8cd9-448ba1dae2e2-dev.e1-us-east-azure.choreoapis.dev/aquawatchapp/registration-service/v1.0";
 
 export default function TripsScreen() {
-
   const navigation = useNavigation();
   const [trips, setTrips] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("current"); 
+  const [activeTab, setActiveTab] = useState("current");
 
   useEffect(() => {
     fetchTrips();
@@ -36,6 +36,7 @@ export default function TripsScreen() {
       setTrips(res.data.trips || []);
     } catch (error) {
       console.error("Error fetching trips:", error.message);
+      Alert.alert("Error", "Failed to load trips. Please try again later.");
     } finally {
       setLoading(false);
     }
@@ -56,9 +57,10 @@ export default function TripsScreen() {
           headers: { Authorization: `Bearer ${parsed.token}` },
         }
       );
-      fetchTrips(); // refresh
+      fetchTrips();
     } catch (error) {
       console.error("Error ending trip:", error.message);
+      Alert.alert("Error", "Could not end trip.");
     }
   };
 
@@ -78,29 +80,45 @@ export default function TripsScreen() {
 
   const renderTrip = ({ item }) => (
     <View style={styles.tripCard}>
-      <Text style={styles.tripTitle}>{item.boat.boatName}</Text>
-      <Text style={styles.tripSub}>Participants: {item.numberOfParticipants}</Text>
-      <Text style={styles.tripSub}>
-        Start: {new Date(item.startDate).toLocaleDateString()}{" "}
-        {item.startTime || ""}
+      <Text style={styles.tripTitle}>
+        {item?.boat?.boatName || "Unknown Boat"}
       </Text>
-      {item.endDate && (
+      <Text style={styles.tripSub}>
+        Participants: {item?.numberOfParticipants || 0}
+      </Text>
+      <Text style={styles.tripSub}>
+        Start:{" "}
+        {item?.startDate
+          ? new Date(item.startDate).toLocaleDateString()
+          : "N/A"}{" "}
+        {item?.startTime || ""}
+      </Text>
+      {item?.endDate && (
         <Text style={styles.tripSub}>
           End: {new Date(item.endDate).toLocaleDateString()}{" "}
-          {item.endTime || ""}
+          {item?.endTime || ""}
         </Text>
       )}
 
       <View style={styles.tripButtons}>
         <TouchableOpacity
           style={[styles.btn, { backgroundColor: "#007bff" }]}
-          onPress={() => navigation.navigate("TripDetails", { trip: item })}
+          onPress={() => {
+            if (!item || !item.boat) {
+              Alert.alert(
+                "Incomplete Data",
+                "Trip details are not available yet."
+              );
+              return;
+            }
+            navigation.navigate("TripDetails", { trip: item });
+          }}
         >
           <Feather name="info" color="#fff" size={16} />
           <Text style={styles.btnText}>View More</Text>
         </TouchableOpacity>
 
-        {!item.endDate && (
+        {!item?.endDate && (
           <TouchableOpacity
             style={[styles.btn, { backgroundColor: "#dc3545" }]}
             onPress={() => handleEndTrip(item._id)}

@@ -9,12 +9,13 @@ import {
   TouchableOpacity,
   Alert,
 } from "react-native";
-import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Feather } from "@expo/vector-icons";
 import * as Location from "expo-location";
 import QRCode from "react-native-qrcode-svg";
-import ViewShot from "react-native-view-shot"; // ✅ MUST import
-import * as FileSystem from "expo-file-system"; // ✅ MUST import
-import * as Sharing from "expo-sharing"; // ✅ MUST import
+import ViewShot from "react-native-view-shot";
+import * as FileSystem from "expo-file-system";
+import * as MediaLibrary from "expo-media-library";
+import * as Sharing from "expo-sharing";
 
 export default function TripDetailsScreen({ route }) {
   const { trip } = route.params;
@@ -34,7 +35,9 @@ export default function TripDetailsScreen({ route }) {
             loc.city || loc.region || ""
           }, ${loc.country}`;
           setStartLocationName(name);
-        } else setStartLocationName("Unknown location");
+        } else {
+          setStartLocationName("Unknown location");
+        }
       } catch (error) {
         console.log(error);
         setStartLocationName("Location unavailable");
@@ -49,27 +52,33 @@ export default function TripDetailsScreen({ route }) {
     try {
       setDownloading(true);
 
-      // ✅ Step 1: Capture QR as image
+      // Capture QR image
       const uri = await qrViewRef.current.capture();
-      const fileUri = `${FileSystem.cacheDirectory}trip_qr_${Date.now()}.jpg`;
-      await FileSystem.copyAsync({ from: uri, to: fileUri });
 
-      // ✅ Step 2: Open system share dialog (safe in Expo Go)
-      const canShare = await Sharing.isAvailableAsync();
-      if (!canShare) {
-        Alert.alert("Not Supported", "Sharing is not available on this device.");
+      // Ask for permission
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("Permission Required", "Please grant gallery access to save the QR code.");
         return;
       }
 
-      await Sharing.shareAsync(fileUri, {
-        mimeType: "image/jpeg",
-        dialogTitle: "Share or Save Trip QR Code",
-      });
+      // Move image to a permanent directory
+      const fileName = `trip_qr_${Date.now()}.jpg`;
+      const newPath = FileSystem.cacheDirectory + fileName;
+      await FileSystem.copyAsync({ from: uri, to: newPath });
 
-      Alert.alert("✅ Done", "QR code ready to share or save.");
+      // Save to gallery
+      await MediaLibrary.saveToLibraryAsync(newPath);
+
+      // Optional: Share
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(newPath);
+      }
+
+      Alert.alert("✅ Success", "QR Code saved to gallery and ready to share!");
     } catch (err) {
-      console.error("Error sharing QR:", err);
-      Alert.alert("Error", "Something went wrong while generating the QR.");
+      console.error("Error saving QR:", err);
+      Alert.alert("Error", "Failed to save or share the QR code.");
     } finally {
       setDownloading(false);
     }
@@ -77,7 +86,6 @@ export default function TripDetailsScreen({ route }) {
 
   return (
     <ScrollView style={styles.container}>
-      {/* 🌊 HEADER */}
       <ImageBackground
         source={{
           uri: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1600&q=80",
@@ -91,7 +99,6 @@ export default function TripDetailsScreen({ route }) {
         </View>
       </ImageBackground>
 
-      {/* ⚓ INFO CARD */}
       <View style={styles.card}>
         <View style={styles.infoRow}>
           <Feather name="users" size={22} color="#007bff" />
@@ -122,19 +129,8 @@ export default function TripDetailsScreen({ route }) {
             {new Date(trip.startDate).toLocaleDateString()} {trip.startTime || ""}
           </Text>
         </View>
-
-        {trip.endDate && (
-          <View style={styles.infoRow}>
-            <Feather name="flag" size={22} color="#007bff" />
-            <Text style={styles.label}>End:</Text>
-            <Text style={styles.value}>
-              {new Date(trip.endDate).toLocaleDateString()} {trip.endTime || ""}
-            </Text>
-          </View>
-        )}
       </View>
 
-      {/* 👥 PARTICIPANTS */}
       <View style={styles.participantsCard}>
         <Text style={styles.participantTitle}>Crew Members</Text>
         {trip.participantIds.map((p) => (
@@ -144,7 +140,6 @@ export default function TripDetailsScreen({ route }) {
         ))}
       </View>
 
-      {/* 🧾 QR SECTION */}
       <View style={styles.qrCard}>
         <Text style={styles.qrTitle}>Trip QR Code</Text>
         {trip.qrData ? (
@@ -163,7 +158,7 @@ export default function TripDetailsScreen({ route }) {
               ) : (
                 <>
                   <Feather name="download" size={18} color="#fff" />
-                  <Text style={styles.downloadText}>Share or Save QR</Text>
+                  <Text style={styles.downloadText}>Save or Share QR</Text>
                 </>
               )}
             </TouchableOpacity>
