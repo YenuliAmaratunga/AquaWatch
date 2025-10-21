@@ -222,6 +222,8 @@ export default function TripRegistrationScreen() {
 
   // ---------------- Submit ----------------
   const handleSubmit = async () => {
+    if (loading) return;
+
     if (!selectedBoat)
       return showAlert("Missing Field", "Please select a boat.", "error");
     if (!heading)
@@ -254,6 +256,7 @@ export default function TripRegistrationScreen() {
       const res = await axios.post(`${AUTH_BASE}/api/Trip/registerTrip`, data, {
         headers: { Authorization: `Bearer ${token}` },
       });
+
       if (res.status === 201) {
         const boat = boats.find((b) => b._id === selectedBoat);
         setTripSuccess({
@@ -263,7 +266,14 @@ export default function TripRegistrationScreen() {
         });
       }
     } catch (e) {
-      showAlert("Error", "Something went wrong during submission.", "error");
+      // ✅ Show backend-provided message if available
+      if (e.response && e.response.data && e.response.data.message) {
+        showAlert("Trip Error", e.response.data.message, "error");
+      } else if (e.response && e.response.data && e.response.data.errors) {
+        showAlert("Validation Error", e.response.data.errors.join("\n"), "error");
+      } else {
+        showAlert("Error", "Something went wrong during submission.", "error");
+      }
     } finally {
       setLoading(false);
     }

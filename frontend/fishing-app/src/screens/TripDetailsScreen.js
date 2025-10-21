@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -6,23 +6,15 @@ import {
   ScrollView,
   ImageBackground,
   ActivityIndicator,
-  TouchableOpacity,
-  Alert,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import * as Location from "expo-location";
 import QRCode from "react-native-qrcode-svg";
-import ViewShot from "react-native-view-shot";
-import * as FileSystem from "expo-file-system";
-import * as MediaLibrary from "expo-media-library";
-import * as Sharing from "expo-sharing";
 
 export default function TripDetailsScreen({ route }) {
   const { trip } = route.params;
   const [startLocationName, setStartLocationName] = useState("");
   const [loadingLocation, setLoadingLocation] = useState(true);
-  const [downloading, setDownloading] = useState(false);
-  const qrViewRef = useRef();
 
   useEffect(() => {
     const fetchLocationName = async () => {
@@ -48,44 +40,9 @@ export default function TripDetailsScreen({ route }) {
     fetchLocationName();
   }, []);
 
-  const handleDownloadQR = async () => {
-    try {
-      setDownloading(true);
-
-      // Capture QR image
-      const uri = await qrViewRef.current.capture();
-
-      // Ask for permission
-      const { status } = await MediaLibrary.requestPermissionsAsync();
-      if (status !== "granted") {
-        Alert.alert("Permission Required", "Please grant gallery access to save the QR code.");
-        return;
-      }
-
-      // Move image to a permanent directory
-      const fileName = `trip_qr_${Date.now()}.jpg`;
-      const newPath = FileSystem.cacheDirectory + fileName;
-      await FileSystem.copyAsync({ from: uri, to: newPath });
-
-      // Save to gallery
-      await MediaLibrary.saveToLibraryAsync(newPath);
-
-      // Optional: Share
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(newPath);
-      }
-
-      Alert.alert("✅ Success", "QR Code saved to gallery and ready to share!");
-    } catch (err) {
-      console.error("Error saving QR:", err);
-      Alert.alert("Error", "Failed to save or share the QR code.");
-    } finally {
-      setDownloading(false);
-    }
-  };
-
   return (
     <ScrollView style={styles.container}>
+      {/* Header */}
       <ImageBackground
         source={{
           uri: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1600&q=80",
@@ -99,6 +56,7 @@ export default function TripDetailsScreen({ route }) {
         </View>
       </ImageBackground>
 
+      {/* Trip Info */}
       <View style={styles.card}>
         <View style={styles.infoRow}>
           <Feather name="users" size={22} color="#007bff" />
@@ -131,38 +89,21 @@ export default function TripDetailsScreen({ route }) {
         </View>
       </View>
 
+      {/* Crew Members */}
       <View style={styles.participantsCard}>
         <Text style={styles.participantTitle}>Crew Members</Text>
         {trip.participantIds.map((p) => (
-          <Text key={p._id} style={styles.participant}>
+          <Text key={p._id || p.nationalId} style={styles.participant}>
             • {p.name} ({p.nationalId})
           </Text>
         ))}
       </View>
 
+      {/* QR Code */}
       <View style={styles.qrCard}>
         <Text style={styles.qrTitle}>Trip QR Code</Text>
         {trip.qrData ? (
-          <>
-            <ViewShot ref={qrViewRef} options={{ format: "jpg", quality: 1.0 }}>
-              <QRCode value={trip.qrData} size={180} color="#000" backgroundColor="#fff" />
-            </ViewShot>
-
-            <TouchableOpacity
-              onPress={handleDownloadQR}
-              style={[styles.downloadBtn, downloading && { opacity: 0.7 }]}
-              disabled={downloading}
-            >
-              {downloading ? (
-                <ActivityIndicator color="#fff" size="small" />
-              ) : (
-                <>
-                  <Feather name="download" size={18} color="#fff" />
-                  <Text style={styles.downloadText}>Save or Share QR</Text>
-                </>
-              )}
-            </TouchableOpacity>
-          </>
+          <QRCode value={trip.qrData} size={180} color="#000" backgroundColor="#fff" />
         ) : (
           <Text style={styles.noQr}>QR Code not available</Text>
         )}
@@ -213,15 +154,4 @@ const styles = StyleSheet.create({
   },
   qrTitle: { fontSize: 18, fontWeight: "700", color: "#007bff", marginBottom: 10 },
   noQr: { color: "#888", marginVertical: 10 },
-  downloadBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#007bff",
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 10,
-    marginTop: 15,
-    gap: 8,
-  },
-  downloadText: { color: "#fff", fontWeight: "600", fontSize: 14 },
 });
