@@ -15,6 +15,7 @@ exports.registerTrip = async (req, res) => {
 
     const errors = [];
 
+    // Basic field validation
     if (!boat || !numberOfParticipants || !participantNationalIds || !startingLocation || heading === undefined) {
       errors.push("Missing required fields");
     }
@@ -36,16 +37,43 @@ exports.registerTrip = async (req, res) => {
 
     // Verify boat
     const existingBoat = await Boat.findById(boat);
-    if (!existingBoat) errors.push("Boat is not registered in the system");
+    if (!existingBoat) {
+      errors.push("Boat is not registered in the system");
+    }
 
     if (errors.length > 0) {
       return res.status(400).json({ message: "Validation failed", errors });
     }
 
+    // ✅ Check if boat is already on a trip
+    const ongoingBoatTrip = await Trip.findOne({
+      boat,
+      endDate: { $exists: false }, // or endDate: null depending on your schema
+    });
+
+    if (ongoingBoatTrip) {
+      return res.status(400).json({
+        message: "This boat is already on an ongoing trip and cannot start a new one.",
+      });
+    }
+
+    // ✅ Check if any participant is already on a trip
+    const ongoingParticipant = await Trip.findOne({
+      participantIds: { $in: participantObjectIds },
+      endDate: { $exists: false },
+    });
+
+    if (ongoingParticipant) {
+      return res.status(400).json({
+        message: "One or more participants are already in another ongoing trip.",
+      });
+    }
+
+    // ✅ Get accurate local time and date
     const now = new Date();
     const shareToken = crypto.randomBytes(8).toString("hex");
 
-    // 1️⃣ Save trip first without QR data
+    // Save new trip
     let newTrip = new Trip({
       fishermanId: req.user.id,
       boat,
@@ -54,17 +82,15 @@ exports.registerTrip = async (req, res) => {
       startingLocation,
       heading,
       startDate: now,
-      startTime: now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      startTime: now.toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit" }),
       shareToken,
       qrGeneratedAt: new Date(),
     });
 
     const savedTrip = await newTrip.save();
 
-    // 2️⃣ Now generate QR using the actual MongoDB _id
+    // Generate QR with trip ID + share token
     const qrData = `https://10b8c329-d78f-4b7f-8cd9-448ba1dae2e2-dev.e1-us-east-azure.choreoapis.dev/aquawatchapp/registration-service/v1.0/api/Trip/view/${savedTrip._id}?token=${shareToken}`;
-
-    // 3️⃣ Update the record
     savedTrip.qrData = qrData;
     await savedTrip.save();
 
@@ -72,11 +98,13 @@ exports.registerTrip = async (req, res) => {
       message: "Fishing trip registered successfully",
       trip: savedTrip,
     });
+
   } catch (error) {
     console.error("Error registering trip:", error);
     return res.status(500).json({ message: "Server error", error: error.message });
   }
 };
+
 
 // ✅ New Endpoint — Get Latest Trip for Logged-in Fisherman
 exports.getLatestTrip = async (req, res) => {
