@@ -1,4 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
   View,
@@ -15,12 +21,18 @@ import {
 import MapView, { Marker, Callout } from "react-native-maps";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useNavigation } from "@react-navigation/native";
-import { AlertTriangle, MapPin, Check, Compass, LogOut } from "lucide-react-native";
-
 import {
-  getLatestBoats,         
-  getActiveAlerts,        
-  getViolationReports,    
+  AlertTriangle,
+  MapPin,
+  Check,
+  Compass,
+  LogOut,
+} from "lucide-react-native";
+import { getUserInfo, labelFor } from "../data/policeUserDirectory";
+import {
+  getLatestBoats,
+  getActiveAlerts,
+  getViolationReports,
   getHazardReports,
   verifyViolation as apiVerifyViolation,
   resolveHazard as apiResolveHazard,
@@ -28,8 +40,27 @@ import {
 
 const fmtCoord = (n) => (typeof n === "number" ? n.toFixed(4) : "—");
 
+const toNum = (v) => {
+  if (typeof v === "number") return v;
+  const n = parseFloat(v);
+  return Number.isFinite(n) ? n : null;
+};
+
+const buildFocusedFromMap = (b, alerts) => {
+  const a = alerts.find(
+    (x) =>
+      (x.boatId || x.reporterId) === b.boatId &&
+      (x.status || "").toLowerCase() === "active"
+  );
+  return { ...b, alertId: a?._id, status: a ? "sos" : b.status };
+};
+
 function SectionTitle({ children }) {
-  return <Text className="text-blue font-bold text-lg px-4 mt-2 mb-2">{children}</Text>;
+  return (
+    <Text className="text-blue font-bold text-lg px-4 mt-2 mb-2">
+      {children}
+    </Text>
+  );
 }
 
 export default function PoliceDashboard() {
@@ -37,46 +68,106 @@ export default function PoliceDashboard() {
 
   const [tab, setTab] = useState("sos");
 
-  const mapRef = useRef(null);     
-  const [boats, setBoats] = useState([]);             
+  const mapRef = useRef(null);
+  const [boats, setBoats] = useState([]);
   const [loadingBoats, setLoadingBoats] = useState(false);
-  const [focusedBoat, setFocusedBoat] = useState(null);   
+  const [focusedBoat, setFocusedBoat] = useState(null);
 
-  const [alerts, setAlerts] = useState([]);         
+  const [alerts, setAlerts] = useState([]);
+  const [sosUiStatus, setSosUiStatus] = useState({});
+
+  // 🆕 hydrate on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const saved = await AsyncStorage.getItem("sosUiStatus");
+        if (saved) setSosUiStatus(JSON.parse(saved));
+      } catch {}
+    })();
+  }, []);
+
+  // 🆕 persist whenever it changes
+  useEffect(() => {
+    AsyncStorage.setItem("sosUiStatus", JSON.stringify(sosUiStatus));
+  }, [sosUiStatus]);
+
   const [loadingAlerts, setLoadingAlerts] = useState(false);
 
   const [loadingReports, setLoadingReports] = useState(false);
   const [violations, setViolations] = useState([]);
   const [hazards, setHazards] = useState([]);
 
-  const [reportType, setReportType] = useState("all");   
-  const [statusFilter, setStatusFilter] = useState("all"); 
-  const [refreshing, setRefreshing] = useState(false);     
+  const [reportType, setReportType] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [refreshing, setRefreshing] = useState(false);
 
+  // 🆕 top-of-page SOS filter
+  const [sosFilter, setSosFilter] = useState("all");
+
+  // must build sosList first
   const sosList = useMemo(() => {
+    const base = alerts
+      .map((a) => {
+        const boatId = a.boatId || a.reporterId || "UNKNOWN";
+        return {
+          id: a._id,
+          alertId: a._id,
+          boatId,
+          lat: toNum(a.location?.latitude),
+          lng: toNum(a.location?.longitude),
+          status: a.status || "active",
+          when: a.timestamp,
+          label: labelFor(boatId),
+        };
+      })
+      .filter((a) => a.lat != null && a.lng != null);
 
-    return alerts.map(a => ({
-      id: a._id,
-      boatId: a.boatId || "UNKNOWN",
-      lat: a.location?.latitude,
-      lng: a.location?.longitude,
-      status: a.status || "active",
-      when: a.timestamp,
-    })).filter(a => typeof a.lat === "number" && typeof a.lng === "number");
+    // Dedupe by boatId: keep the most recent alert (by timestamp)
+    const byBoat = new Map();
+    for (const it of base) {
+      const prev = byBoat.get(it.boatId);
+      const t = new Date(it.when || 0).getTime();
+      const pt = new Date(prev?.when || 0).getTime();
+      if (!prev || t > pt) byBoat.set(it.boatId, it);
+    }
+    return Array.from(byBoat.values());
   }, [alerts]);
 
+  // decorate with local triage status
+  const sosWithLocal = useMemo(
+    () =>
+      sosList.map((i) => ({
+        ...i,
+        //localStatus: sosUiStatus[i.alertId] || "active",
+        localStatus: sosUiStatus[i.boatId] || "active",
+      })),
+    [sosList, sosUiStatus]
+  );
+
+  // apply filter
+  const filteredSos = useMemo(
+    () =>
+      sosFilter === "all"
+        ? sosWithLocal
+        : sosWithLocal.filter((i) => i.localStatus === sosFilter),
+    [sosWithLocal, sosFilter]
+  );
 
   const filteredViolations = useMemo(() => {
     if (reportType !== "all" && reportType !== "violation") return [];
     return violations.filter((r) =>
-      statusFilter === "all" ? true : (r.status || "").toLowerCase() === statusFilter
+      statusFilter === "all"
+        ? true
+        : (r.status || "").toLowerCase() === statusFilter
     );
   }, [violations, reportType, statusFilter]);
 
   const filteredHazards = useMemo(() => {
     if (reportType !== "all" && reportType !== "hazard") return [];
     return hazards.filter((r) =>
-      statusFilter === "all" ? true : (r.status || "").toLowerCase() === statusFilter
+      statusFilter === "all"
+        ? true
+        : (r.status || "").toLowerCase() === statusFilter
     );
   }, [hazards, reportType, statusFilter]);
 
@@ -93,12 +184,15 @@ export default function PoliceDashboard() {
           return {
             boatId: row._id || row.boatId || source?.boatId,
             name: row.name || row.boatName || `${row._id || row.boatId || "?"}`,
-            lat: source?.latitude ?? row.latitude,
-            lng: source?.longitude ?? row.longitude,
+            //lat: source?.latitude ?? row.latitude,
+            //lng: source?.longitude ?? row.longitude,
+            lat: toNum(source?.latitude ?? row.latitude),
+            lng: toNum(source?.longitude ?? row.longitude),
             status: (source?.status ?? row.status) || "active",
           };
         })
-        .filter((b) => typeof b.lat === "number" && typeof b.lng === "number");
+        //.filter((b) => typeof b.lat === "number" && typeof b.lng === "number");
+        .filter((b) => b.lat != null && b.lng != null);
 
       setBoats(normalized);
 
@@ -106,7 +200,10 @@ export default function PoliceDashboard() {
       if (mapRef.current && normalized.length && tab === "map") {
         mapRef.current.fitToCoordinates(
           normalized.map((b) => ({ latitude: b.lat, longitude: b.lng })),
-          { edgePadding: { top: 80, right: 80, bottom: 80, left: 80 }, animated: true }
+          {
+            edgePadding: { top: 80, right: 80, bottom: 80, left: 80 },
+            animated: true,
+          }
         );
       }
     } catch (e) {
@@ -120,13 +217,18 @@ export default function PoliceDashboard() {
   const loadAlerts = useCallback(async () => {
     setLoadingAlerts(true);
     try {
-      const res = await getActiveAlerts();         // may be {success:true, data:[...]} or raw array
-      const list =
-        Array.isArray(res) ? res :
-        Array.isArray(res?.data) ? res.data :
-        Array.isArray(res?.data?.data) ? res.data.data : [];
+      const res = await getActiveAlerts(); // may be {success:true, data:[...]} or raw array
+      const list = Array.isArray(res)
+        ? res
+        : Array.isArray(res?.data)
+          ? res.data
+          : Array.isArray(res?.data?.data)
+            ? res.data.data
+            : [];
       // keep only 'active' (API should already filter, but be safe)
-      const active = list.filter(a => (a.status || "").toLowerCase() === "active");
+      const active = list.filter(
+        (a) => (a.status || "").toLowerCase() === "active"
+      );
       setAlerts(active);
     } catch (e) {
       console.log("loadAlerts error:", e.message);
@@ -138,8 +240,8 @@ export default function PoliceDashboard() {
 
   // initial & interval fetchers
   useEffect(() => {
-    loadAlerts();             // alerts power the SOS tab
-    loadBoats();              // boats power the map tab
+    loadAlerts(); // alerts power the SOS tab
+    loadBoats(); // boats power the map tab
     const iv = setInterval(() => {
       loadAlerts();
       loadBoats();
@@ -153,9 +255,16 @@ export default function PoliceDashboard() {
       (async () => {
         setLoadingReports(true);
         try {
-          const [v, h] = await Promise.all([getViolationReports(), getHazardReports()]);
-          setViolations(Array.isArray(v?.data) ? v.data : Array.isArray(v) ? v : []);
-          setHazards(Array.isArray(h?.data) ? h.data : Array.isArray(h) ? h : []);
+          const [v, h] = await Promise.all([
+            getViolationReports(),
+            getHazardReports(),
+          ]);
+          setViolations(
+            Array.isArray(v?.data) ? v.data : Array.isArray(v) ? v : []
+          );
+          setHazards(
+            Array.isArray(h?.data) ? h.data : Array.isArray(h) ? h : []
+          );
         } catch (e) {
           console.log("loadReports error:", e.message);
         } finally {
@@ -171,8 +280,13 @@ export default function PoliceDashboard() {
     try {
       await Promise.all([loadAlerts(), loadBoats()]);
       if (tab === "reports") {
-        const [v, h] = await Promise.all([getViolationReports(), getHazardReports()]);
-        setViolations(Array.isArray(v?.data) ? v.data : Array.isArray(v) ? v : []);
+        const [v, h] = await Promise.all([
+          getViolationReports(),
+          getHazardReports(),
+        ]);
+        setViolations(
+          Array.isArray(v?.data) ? v.data : Array.isArray(v) ? v : []
+        );
         setHazards(Array.isArray(h?.data) ? h.data : Array.isArray(h) ? h : []);
       }
     } finally {
@@ -186,7 +300,9 @@ export default function PoliceDashboard() {
       await apiVerifyViolation(id);
       if (tab === "reports") {
         const v = await getViolationReports();
-        setViolations(Array.isArray(v?.data) ? v.data : Array.isArray(v) ? v : []);
+        setViolations(
+          Array.isArray(v?.data) ? v.data : Array.isArray(v) ? v : []
+        );
       }
     } catch {
       Alert.alert("Error", "Failed to verify violation");
@@ -210,7 +326,10 @@ export default function PoliceDashboard() {
     try {
       await AsyncStorage.removeItem("auth");
     } catch {}
-    navigation.reset({ index: 0, routes: [{ name: "Login", params: { language: "en" } }] });
+    navigation.reset({
+      index: 0,
+      routes: [{ name: "Login", params: { language: "en" } }],
+    });
   };
 
   // tiny components
@@ -221,7 +340,11 @@ export default function PoliceDashboard() {
         onPress={() => setTab(value)}
         className={`px-4 py-2 rounded-full mr-2 border ${active ? "bg-blueLight border-blueLight" : "border-blueLight"}`}
       >
-        <Text className={`${active ? "text-white" : "text-blue"} font-semibold`}>{label}</Text>
+        <Text
+          className={`${active ? "text-white" : "text-blue"} font-semibold`}
+        >
+          {label}
+        </Text>
       </TouchableOpacity>
     );
   }
@@ -233,12 +356,16 @@ export default function PoliceDashboard() {
         onPress={() => onChange(value)}
         className={`px-3 py-1.5 rounded-full mr-2 border ${active ? "bg-blueLight border-blueLight" : "border-blueLight"}`}
       >
-        <Text className={`${active ? "text-white" : "text-blue"} text-xs font-semibold`}>{label}</Text>
+        <Text
+          className={`${active ? "text-white" : "text-blue"} text-xs font-semibold`}
+        >
+          {label}
+        </Text>
       </TouchableOpacity>
     );
   }
 
-return (
+  return (
     <SafeAreaView className="flex-1 bg-white" edges={["top"]}>
       {/* Header */}
       <View className="px-4 pt-2 pb-3 flex-row items-center justify-between">
@@ -246,7 +373,10 @@ return (
           <Text className="text-2xl font-bold text-blue">Marine Police</Text>
           <Text className="text-secondaryText">SOS • Boats • Reports</Text>
         </View>
-        <TouchableOpacity className="flex-row items-center bg-lightPurple px-3 py-2 rounded-xl" onPress={handleLogout}>
+        <TouchableOpacity
+          className="flex-row items-center bg-lightPurple px-3 py-2 rounded-xl"
+          onPress={handleLogout}
+        >
           <LogOut size={16} color="#3C467B" />
           <Text className="ml-2 text-blue font-semibold">Logout</Text>
         </TouchableOpacity>
@@ -270,7 +400,8 @@ return (
               </View>
               <View className="flex-1">
                 <Text className="text-white font-heading font-bold text-xl">
-                  Active SOS Alerts: {loadingAlerts ? "..." : sosList.length}
+                  Active SOS Alerts:{" "}
+                  {loadingAlerts ? "..." : sosList.length}
                 </Text>
                 <Text className="text-white/90 text-sm font-sans mt-1">
                   Emergency situations requiring immediate attention
@@ -282,82 +413,155 @@ return (
           {loadingAlerts ? (
             <View className="flex-1 justify-center items-center">
               <ActivityIndicator size="large" color="#DC2626" />
-              <Text className="text-darkBlue font-sans mt-4">Loading emergency alerts...</Text>
+              <Text className="text-darkBlue font-sans mt-4">
+                Loading emergency alerts...
+              </Text>
             </View>
           ) : (
-            <FlatList
-              data={sosList}
-              keyExtractor={(a) => a.id}
-              refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-              contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 24 }}
-              ListEmptyComponent={
-                <View className="items-center mt-16">
-                  <View className="bg-green-50 rounded-3xl p-8 items-center border border-green-200">
-                    <Text className="text-4xl mb-4">✅</Text>
-                    <Text className="text-darkBlue font-heading font-bold text-xl mb-2">All Clear!</Text>
-                    <Text className="text-secondaryText text-center font-sans">
-                      No active emergency alerts at this time
+            <>
+              {/* 🆕 SOS status filter row */}
+              <View className="flex-row px-6 mb-2">
+                {[
+                  "all",
+                  "active",
+                  "help-sent",
+                  "resolved" /*, 'acknowledged'*/,
+                ].map((v) => (
+                  <TouchableOpacity
+                    key={v}
+                    onPress={() => setSosFilter(v)}
+                    className={`px-3 py-1.5 mr-2 rounded-full border ${sosFilter === v ? "bg-blueLight border-blueLight" : "border-blueLight"}`}
+                  >
+                    <Text
+                      className={`${sosFilter === v ? "text-white" : "text-blue"} text-xs font-semibold`}
+                    >
+                      {v === "all"
+                        ? "All"
+                        : v
+                            .replace("-", " ")
+                            .replace(/\b\w/g, (c) => c.toUpperCase())}
                     </Text>
-                  </View>
-                </View>
-              }
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  className="bg-white rounded-3xl p-5 mb-4 border-2 border-red-200 shadow-xl"
-                  style={{
-                    shadowColor: "#DC2626",
-                    shadowOffset: { width: 0, height: 6 },
-                    shadowOpacity: 0.2,
-                    shadowRadius: 12,
-                  }}
-                  onPress={() => {
-                    setTab("map");
-                    setTimeout(() => {
-                      if (mapRef.current && typeof item.lat === "number" && typeof item.lng === "number") {
-                        mapRef.current.animateToRegion(
-                          { latitude: item.lat, longitude: item.lng, latitudeDelta: 0.05, longitudeDelta: 0.05 },
-                          500
-                        );
-                      }
-                      setFocusedBoat({
-                        name: `${item.boatId}`,
-                        lat: item.lat,
-                        lng: item.lng,
-                        status: "sos",
-                      });
-                    }, 250);
-                  }}
-                >
-                  <View className="flex-row items-center mb-3">
-                    <View className="bg-red-100 rounded-full p-3 mr-4">
-                      <AlertTriangle color="#DC2626" size={24} />
-                    </View>
-                    <View className="flex-1">
-                      <Text className="text-darkBlue font-heading font-bold text-xl">
-                        {item.boatId}
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <FlatList
+                data={filteredSos}
+                keyExtractor={(a) => a.id}
+                refreshControl={
+                  <RefreshControl
+                    refreshing={refreshing}
+                    onRefresh={onRefresh}
+                  />
+                }
+                contentContainerStyle={{
+                  paddingHorizontal: 24,
+                  paddingBottom: 24,
+                }}
+                ListEmptyComponent={
+                  <View className="items-center mt-16">
+                    <View className="bg-green-50 rounded-3xl p-8 items-center border border-green-200">
+                      <Text className="text-4xl mb-4">✅</Text>
+                      <Text className="text-darkBlue font-heading font-bold text-xl mb-2">
+                        All Clear!
                       </Text>
-                      <Text className="text-red-600 font-sans font-semibold text-lg">EMERGENCY SOS</Text>
+                      <Text className="text-secondaryText text-center font-sans">
+                        No active emergency alerts at this time
+                      </Text>
                     </View>
                   </View>
-                  <Text className="text-secondaryText font-sans text-base mb-3">
-                    📍 {fmtCoord(item.lat)}, {fmtCoord(item.lng)}
-                  </Text>
-                  <View className="flex-row items-center justify-between">
-                    <View className="bg-red-600 rounded-full px-4 py-2">
-                      <Text className="text-white text-sm font-sans font-bold">HIGH PRIORITY</Text>
-                    </View>
-                    <Text className="text-accentText font-sans font-semibold">View on Map →</Text>
-                  </View>
-                </TouchableOpacity>
-              )}
-            />
+                }
+                renderItem={({ item }) => {
+                  const statusToChip = (s) =>
+                    s === "resolved"
+                      ? { bg: "bg-green-600", label: "Resolved" }
+                      : s === "help-sent"
+                        ? { bg: "bg-orange-500", label: "Help sent" }
+                        : { bg: "bg-red-600", label: "Active" };
+                  const chip = statusToChip(item.localStatus);
+
+                  return (
+                    <TouchableOpacity
+                      className="bg-white rounded-3xl p-5 mb-4 border-2 border-red-200 shadow-xl"
+                      style={{
+                        shadowColor: "#DC2626",
+                        shadowOffset: { width: 0, height: 6 },
+                        shadowOpacity: 0.2,
+                        shadowRadius: 12,
+                      }}
+                      onPress={() => {
+                        setTab("map");
+                        setTimeout(() => {
+                          if (
+                            mapRef.current &&
+                            typeof item.lat === "number" &&
+                            typeof item.lng === "number"
+                          ) {
+                            mapRef.current.animateToRegion(
+                              {
+                                latitude: item.lat,
+                                longitude: item.lng,
+                                latitudeDelta: 0.05,
+                                longitudeDelta: 0.05,
+                              },
+                              500
+                            );
+                          }
+                          setFocusedBoat({
+                            boatId: item.boatId,
+                            alertId: item.alertId,
+                            name: item.label,
+                            lat: item.lat,
+                            lng: item.lng,
+                            status: "sos",
+                          });
+                        }, 250);
+                      }}
+                    >
+                      <View className="flex-row items-center justify-between mb-3">
+                        <View className="bg-red-100 rounded-full p-3 mr-4">
+                          <AlertTriangle color="#DC2626" size={24} />
+                        </View>
+                        <View className="flex-1">
+                          <Text className="text-darkBlue font-heading font-bold text-xl">
+                            {item.label}
+                          </Text>
+                          <View className="self-start bg-red-600/90 px-3 py-1 rounded-full">
+                            <Text className="text-white font-sans font-semibold text-xs">
+                              SOS
+                            </Text>
+                          </View>
+                        </View>
+                      </View>
+
+                      <Text className="text-secondaryText font-sans text-base mb-3">
+                        📍 {fmtCoord(item.lat)}, {fmtCoord(item.lng)}
+                      </Text>
+
+                      <View className="flex-row items-center justify-between">
+                        {/* 🆕 dynamic chip */}
+                        <View className={`${chip.bg} rounded-full px-4 py-2`}>
+                          <Text className="text-white text-sm font-sans font-bold">
+                            {chip.label}
+                          </Text>
+                        </View>
+                        <Text className="text-accentText font-sans font-semibold">
+                          View on Map →
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                }}
+              />
+            </>
           )}
         </View>
       )}
 
       {/* Enhanced MAP tab */}
       {tab === "map" && (
-        <View className="flex-1 mx-6 mb-6 mt-4 rounded-3xl overflow-hidden border-2 border-lightPurple shadow-2xl"
+        <View
+          className="flex-1 mx-6 mb-6 mt-4 rounded-3xl overflow-hidden border-2 border-lightPurple shadow-2xl"
           style={{
             shadowColor: "#636CCB",
             shadowOffset: { width: 0, height: 12 },
@@ -380,36 +584,75 @@ return (
             }}
           >
             {boats.map((b) => {
-              const isSOS = (b.status || "").toLowerCase() === "sos";
+              //const isSOS = (b.status || "").toLowerCase() === "sos";
+              const isSOS =
+                (b.status || "").toLowerCase() === "sos" ||
+                alerts.some(
+                  (a) =>
+                    (a.boatId || a.reporterId) === b.boatId &&
+                    (a.status || "").toLowerCase() === "active"
+                );
               return (
                 <Marker
-                  key={`${b.boatId}-${b.lat}-${b.lng}`}
+                  //key={`${b.boatId}-${b.lat}-${b.lng}`}
+                  key={String(b.boatId)}
                   coordinate={{ latitude: b.lat, longitude: b.lng }}
                   pinColor={isSOS ? "#DC2626" : "#50589C"}
-                  onPress={() => setFocusedBoat(b)}
+                  //onPress={() => setFocusedBoat(b)}
+                  onPress={() => setFocusedBoat(buildFocusedFromMap(b, alerts))}
                 >
                   {isSOS && (
                     <View className="bg-red-600 px-3 py-1 rounded-full -mt-8 border-2 border-white shadow-lg">
-                      <Text className="text-white text-xs font-sans font-bold">🚨 SOS</Text>
+                      <Text className="text-white text-xs font-sans font-bold">
+                        🚨 SOS
+                      </Text>
                     </View>
                   )}
-                  <Callout onPress={() => setFocusedBoat(b)}>
+                  <Callout
+                    onPress={() =>
+                      setFocusedBoat(buildFocusedFromMap(b, alerts))
+                    }
+                  >
                     <View style={{ maxWidth: 240, padding: 12 }}>
-                      <Text style={{ fontWeight: "700", color: "#3C467B", marginBottom: 4, fontSize: 16 }}>
-                        {b.name}
+                      <Text
+                        style={{
+                          fontWeight: "700",
+                          color: "#3C467B",
+                          marginBottom: 4,
+                          fontSize: 16,
+                        }}
+                      >
+                        {labelFor(b.boatId) || b.name}
                       </Text>
                       <Text style={{ color: "#3C467B", fontSize: 14 }}>
                         {fmtCoord(b.lat)}, {fmtCoord(b.lng)}
                       </Text>
                       {isSOS && (
-                        <View style={{ flexDirection: "row", alignItems: "center", marginTop: 6 }}>
+                        <View
+                          style={{
+                            flexDirection: "row",
+                            alignItems: "center",
+                            marginTop: 6,
+                          }}
+                        >
                           <AlertTriangle size={16} color="#DC2626" />
-                          <Text style={{ color: "#DC2626", marginLeft: 6, fontWeight: "600", fontSize: 14 }}>
-                            Active Emergency
+                          <Text
+                            style={{
+                              color: "#DC2626",
+                              marginLeft: 6,
+                              fontWeight: "700",
+                              fontSize: 14,
+                            }}
+                          >
+                            SOS
                           </Text>
                         </View>
                       )}
-                      <Text style={{ color: "#6E8CFB", marginTop: 8, fontSize: 14 }}>Tap for details →</Text>
+                      <Text
+                        style={{ color: "#6E8CFB", marginTop: 8, fontSize: 14 }}
+                      >
+                        Tap for details →
+                      </Text>
                     </View>
                   </Callout>
                 </Marker>
@@ -429,13 +672,18 @@ return (
               if (!boats.length || !mapRef.current) return;
               mapRef.current.fitToCoordinates(
                 boats.map((b) => ({ latitude: b.lat, longitude: b.lng })),
-                { edgePadding: { top: 80, right: 80, bottom: 80, left: 80 }, animated: true }
+                {
+                  edgePadding: { top: 80, right: 80, bottom: 80, left: 80 },
+                  animated: true,
+                }
               );
             }}
           >
             <View className="flex-row items-center">
               <Compass size={20} color="#3C467B" />
-              <Text className="ml-2 text-blue font-sans font-semibold">Fit All Boats</Text>
+              <Text className="ml-2 text-blue font-sans font-semibold">
+                Fit All Boats
+              </Text>
             </View>
           </TouchableOpacity>
         </View>
@@ -447,20 +695,67 @@ return (
           {/* Enhanced Filters */}
           <View className="px-6 pt-6 pb-4 bg-white border-b border-lightPurple">
             <View className="mb-4">
-              <Text className="text-darkBlue font-heading font-bold text-lg mb-3">📊 Report Type</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row">
-                <FilterChip value="all" current={reportType} onChange={setReportType} label="📋 All Reports" />
-                <FilterChip value="violation" current={reportType} onChange={setReportType} label="⚖️ Violations" />
-                <FilterChip value="hazard" current={reportType} onChange={setReportType} label="⚠️ Hazards" />
+              <Text className="text-darkBlue font-heading font-bold text-lg mb-3">
+                📊 Report Type
+              </Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                className="flex-row"
+              >
+                <FilterChip
+                  value="all"
+                  current={reportType}
+                  onChange={setReportType}
+                  label="📋 All Reports"
+                />
+                <FilterChip
+                  value="violation"
+                  current={reportType}
+                  onChange={setReportType}
+                  label="⚖️ Violations"
+                />
+                <FilterChip
+                  value="hazard"
+                  current={reportType}
+                  onChange={setReportType}
+                  label="⚠️ Hazards"
+                />
               </ScrollView>
             </View>
             <View>
-              <Text className="text-darkBlue font-heading font-bold text-lg mb-3">🎯 Status Filter</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row">
-                <FilterChip value="all" current={statusFilter} onChange={setStatusFilter} label="All Status" />
-                <FilterChip value="pending" current={statusFilter} onChange={setStatusFilter} label="⏳ Pending" />
-                <FilterChip value="verified" current={statusFilter} onChange={setStatusFilter} label="✅ Verified" />
-                <FilterChip value="resolved" current={statusFilter} onChange={setStatusFilter} label="✅ Resolved" />
+              <Text className="text-darkBlue font-heading font-bold text-lg mb-3">
+                🎯 Status Filter
+              </Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                className="flex-row"
+              >
+                <FilterChip
+                  value="all"
+                  current={statusFilter}
+                  onChange={setStatusFilter}
+                  label="All Status"
+                />
+                <FilterChip
+                  value="pending"
+                  current={statusFilter}
+                  onChange={setStatusFilter}
+                  label="⏳ Pending"
+                />
+                <FilterChip
+                  value="verified"
+                  current={statusFilter}
+                  onChange={setStatusFilter}
+                  label="✅ Verified"
+                />
+                <FilterChip
+                  value="resolved"
+                  current={statusFilter}
+                  onChange={setStatusFilter}
+                  label="✅ Resolved"
+                />
               </ScrollView>
             </View>
           </View>
@@ -468,37 +763,47 @@ return (
           {loadingReports ? (
             <View className="flex-1 justify-center items-center">
               <ActivityIndicator size="large" color="#50589C" />
-              <Text className="text-darkBlue font-sans mt-4">Loading reports...</Text>
+              <Text className="text-darkBlue font-sans mt-4">
+                Loading reports...
+              </Text>
             </View>
           ) : (
             <ScrollView
               contentContainerStyle={{ paddingBottom: 24 }}
-              refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+              refreshControl={
+                <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+              }
               showsVerticalScrollIndicator={false}
             >
               <View className="px-6 pt-6">
                 {/* Violation Reports Section */}
                 <View className="mb-8">
                   <View className="flex-row items-center justify-between mb-4">
-                    <Text className="text-darkBlue font-heading font-bold text-2xl">⚖️ Violation Reports</Text>
+                    <Text className="text-darkBlue font-heading font-bold text-2xl">
+                      ⚖️ Violation Reports
+                    </Text>
                     <View className="bg-blueLight rounded-full px-3 py-1">
                       <Text className="text-white text-sm font-sans font-semibold">
                         {filteredViolations.length} reports
                       </Text>
                     </View>
                   </View>
-                  
+
                   {filteredViolations.length === 0 ? (
                     <View className="bg-lightPurple/30 rounded-3xl p-8 items-center border border-lightPurple">
                       <Text className="text-4xl mb-4">📝</Text>
-                      <Text className="text-darkBlue font-heading font-bold text-xl mb-2">No Violation Reports</Text>
+                      <Text className="text-darkBlue font-heading font-bold text-xl mb-2">
+                        No Violation Reports
+                      </Text>
                       <Text className="text-secondaryText font-sans text-center">
                         No violation reports match your current filters
                       </Text>
                     </View>
                   ) : (
                     filteredViolations.map((r) => (
-                      <View key={r._id} className="bg-white rounded-3xl p-6 mb-4 border border-lightPurple shadow-xl"
+                      <View
+                        key={r._id}
+                        className="bg-white rounded-3xl p-6 mb-4 border border-lightPurple shadow-xl"
                         style={{
                           shadowColor: "#000",
                           shadowOffset: { width: 0, height: 6 },
@@ -510,29 +815,46 @@ return (
                           <Text className="text-darkBlue font-heading font-bold text-xl flex-1 mr-4">
                             {r.violationType || "Violation Report"}
                           </Text>
-                          <View className={`px-3 py-2 rounded-full ${
-                            (r.status || "").toLowerCase() === 'verified' ? 'bg-green-100 border border-green-200' : 
-                            (r.status || "").toLowerCase() === 'resolved' ? 'bg-blue-100 border border-blue-200' : 
-                            'bg-yellow-100 border border-yellow-200'
-                          }`}>
-                            <Text className={`text-xs font-sans font-semibold capitalize ${
-                              (r.status || "").toLowerCase() === 'verified' ? 'text-green-800' : 
-                              (r.status || "").toLowerCase() === 'resolved' ? 'text-blue-800' : 
-                              'text-yellow-800'
-                            }`}>
+                          <View
+                            className={`px-3 py-2 rounded-full ${
+                              (r.status || "").toLowerCase() === "verified"
+                                ? "bg-green-100 border border-green-200"
+                                : (r.status || "").toLowerCase() === "resolved"
+                                  ? "bg-blue-100 border border-blue-200"
+                                  : "bg-yellow-100 border border-yellow-200"
+                            }`}
+                          >
+                            <Text
+                              className={`text-xs font-sans font-semibold capitalize ${
+                                (r.status || "").toLowerCase() === "verified"
+                                  ? "text-green-800"
+                                  : (r.status || "").toLowerCase() ===
+                                      "resolved"
+                                    ? "text-blue-800"
+                                    : "text-yellow-800"
+                              }`}
+                            >
                               {r.status || "pending"}
                             </Text>
                           </View>
                         </View>
-                        
+
                         <Text className="text-secondaryText font-sans text-base leading-6 mb-4">
                           {r.description}
                         </Text>
 
                         {!!r?.evidence?.imageUrl?.length && (
-                          <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-4">
+                          <ScrollView
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            className="mb-4"
+                          >
                             {r.evidence.imageUrl.map((u, i) => (
-                              <Image key={i} source={{ uri: u }} className="w-28 h-28 rounded-2xl mr-3 border border-lightPurple" />
+                              <Image
+                                key={i}
+                                source={{ uri: u }}
+                                className="w-28 h-28 rounded-2xl mr-3 border border-lightPurple"
+                              />
                             ))}
                           </ScrollView>
                         )}
@@ -540,12 +862,12 @@ return (
                         <View className="flex-row justify-between items-center pt-4 border-t border-lightPurple">
                           <View className="flex-row items-center">
                             <Text className="text-accentText text-sm font-sans">
-                              Reported by: {r.reporterId || "Anonymous"}
+                              Reporter: {labelFor(r.reporterId || r.boatId)}
                             </Text>
                           </View>
-                          
+
                           {(r.status || "").toLowerCase() !== "verified" && (
-                            <TouchableOpacity 
+                            <TouchableOpacity
                               className="bg-green-600 rounded-2xl px-5 py-3 shadow-lg"
                               onPress={() => onVerifyViolation(r._id)}
                               style={{
@@ -557,7 +879,9 @@ return (
                             >
                               <View className="flex-row items-center">
                                 <Check size={18} color="white" />
-                                <Text className="text-white font-sans font-semibold ml-2">Verify Report</Text>
+                                <Text className="text-white font-sans font-semibold ml-2">
+                                  Verify Report
+                                </Text>
                               </View>
                             </TouchableOpacity>
                           )}
@@ -570,25 +894,31 @@ return (
                 {/* Hazard Reports Section */}
                 <View className="mb-8">
                   <View className="flex-row items-center justify-between mb-4">
-                    <Text className="text-darkBlue font-heading font-bold text-2xl">⚠️ Hazard Reports</Text>
+                    <Text className="text-darkBlue font-heading font-bold text-2xl">
+                      ⚠️ Hazard Reports
+                    </Text>
                     <View className="bg-orange-500 rounded-full px-3 py-1">
                       <Text className="text-white text-sm font-sans font-semibold">
                         {filteredHazards.length} reports
                       </Text>
                     </View>
                   </View>
-                  
+
                   {filteredHazards.length === 0 ? (
                     <View className="bg-lightPurple/30 rounded-3xl p-8 items-center border border-lightPurple">
                       <Text className="text-4xl mb-4">🌊</Text>
-                      <Text className="text-darkBlue font-heading font-bold text-xl mb-2">No Hazard Reports</Text>
+                      <Text className="text-darkBlue font-heading font-bold text-xl mb-2">
+                        No Hazard Reports
+                      </Text>
                       <Text className="text-secondaryText font-sans text-center">
                         No hazard reports match your current filters
                       </Text>
                     </View>
                   ) : (
                     filteredHazards.map((r) => (
-                      <View key={r._id} className="bg-white rounded-3xl p-6 mb-4 border border-lightPurple shadow-xl"
+                      <View
+                        key={r._id}
+                        className="bg-white rounded-3xl p-6 mb-4 border border-lightPurple shadow-xl"
                         style={{
                           shadowColor: "#000",
                           shadowOffset: { width: 0, height: 6 },
@@ -600,39 +930,62 @@ return (
                           <Text className="text-darkBlue font-heading font-bold text-xl flex-1 mr-4">
                             {r.hazardType || "Hazard Report"}
                           </Text>
-                          <View className={`px-3 py-2 rounded-full ${
-                            (r.status || "").toLowerCase() === 'resolved' ? 'bg-blue-100 border border-blue-200' : 
-                            'bg-yellow-100 border border-yellow-200'
-                          }`}>
-                            <Text className={`text-xs font-sans font-semibold capitalize ${
-                              (r.status || "").toLowerCase() === 'resolved' ? 'text-blue-800' : 'text-yellow-800'
-                            }`}>
+                          <View
+                            className={`px-3 py-2 rounded-full ${
+                              (r.status || "").toLowerCase() === "resolved"
+                                ? "bg-blue-100 border border-blue-200"
+                                : "bg-yellow-100 border border-yellow-200"
+                            }`}
+                          >
+                            <Text
+                              className={`text-xs font-sans font-semibold capitalize ${
+                                (r.status || "").toLowerCase() === "resolved"
+                                  ? "text-blue-800"
+                                  : "text-yellow-800"
+                              }`}
+                            >
                               {r.status || "pending"}
                             </Text>
                           </View>
                         </View>
-                        
+
                         <Text className="text-secondaryText font-sans text-base leading-6 mb-4">
                           {r.description}
                         </Text>
 
                         {!!r?.evidence?.imageUrl?.length && (
-                          <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-4">
+                          <ScrollView
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            className="mb-4"
+                          >
                             {r.evidence.imageUrl.map((u, i) => (
-                              <Image key={i} source={{ uri: u }} className="w-28 h-28 rounded-2xl mr-3 border border-lightPurple" />
+                              <Image
+                                key={i}
+                                source={{ uri: u }}
+                                className="w-28 h-28 rounded-2xl mr-3 border border-lightPurple"
+                              />
                             ))}
                           </ScrollView>
                         )}
 
                         <View className="flex-row justify-between items-center pt-4 border-t border-lightPurple">
                           <View className="flex-row items-center">
-                            <Text className="text-accentText text-sm font-sans">
-                              Severity: <Text className="font-semibold capitalize">{r.severity || "medium"}</Text>
-                            </Text>
+                            <View>
+                              <Text className="text-accentText text-sm font-sans">
+                                Severity:{" "}
+                                <Text className="font-semibold capitalize">
+                                  {r.severity || "medium"}
+                                </Text>
+                              </Text>
+                              <Text className="text-accentText text-sm font-sans mt-1">
+                                Reporter: {labelFor(r.reporterId || r.boatId)}
+                              </Text>
+                            </View>
                           </View>
-                          
+
                           {(r.status || "").toLowerCase() !== "resolved" && (
-                            <TouchableOpacity 
+                            <TouchableOpacity
                               className="bg-blue rounded-2xl px-5 py-3 shadow-lg"
                               onPress={() => onResolveHazard(r._id)}
                               style={{
@@ -642,7 +995,9 @@ return (
                                 shadowRadius: 8,
                               }}
                             >
-                              <Text className="text-white font-sans font-semibold">Mark Resolved</Text>
+                              <Text className="text-white font-sans font-semibold">
+                                Mark Resolved
+                              </Text>
                             </TouchableOpacity>
                           )}
                         </View>
@@ -657,9 +1012,15 @@ return (
       )}
 
       {/* Enhanced Boat detail modal */}
-      <Modal transparent animationType="slide" visible={!!focusedBoat} onRequestClose={() => setFocusedBoat(null)}>
+      <Modal
+        transparent
+        animationType="slide"
+        visible={!!focusedBoat}
+        onRequestClose={() => setFocusedBoat(null)}
+      >
         <View className="flex-1 justify-end bg-black/60">
-          <View className="bg-white rounded-t-3xl p-6 mx-2 mb-2 shadow-3xl border border-lightPurple"
+          <View
+            className="bg-white rounded-t-3xl p-6 mx-2 mb-2 shadow-3xl border border-lightPurple"
             style={{
               shadowColor: "#000",
               shadowOffset: { width: 0, height: -8 },
@@ -669,32 +1030,125 @@ return (
           >
             {focusedBoat && (
               <>
-                <View className="flex-row items-center justify-between mb-4">
-                  <Text className="text-darkBlue font-heading font-bold text-2xl">{focusedBoat.name || "Selected Boat"}</Text>
+                <View className="flex-row items-center justify-between mb-3">
+                  <Text className="text-darkBlue font-heading font-bold text-2xl">
+                    {focusedBoat.name || "Selected Boat"}
+                  </Text>
                   {(focusedBoat.status || "").toLowerCase() === "sos" && (
                     <View className="bg-red-600 rounded-full px-3 py-1">
-                      <Text className="text-white text-sm font-sans font-bold">🚨 EMERGENCY</Text>
+                      <Text className="text-white text-xs font-sans font-bold">
+                        SOS
+                      </Text>
                     </View>
                   )}
                 </View>
-                <Text className="text-secondaryText font-sans text-base mb-6">
-                  📍 {fmtCoord(focusedBoat.lat)}, {fmtCoord(focusedBoat.lng)}
-                </Text>
-                <View className="flex-row space-x-3 mb-6">
-                  <TouchableOpacity className="bg-lightPurple rounded-2xl px-4 py-3 flex-1">
-                    <View className="flex-row items-center justify-center">
-                      <MapPin size={18} color="#3C467B" />
-                      <Text className="text-blue font-sans font-semibold ml-2">Copy Coordinates</Text>
-                    </View>
-                  </TouchableOpacity>
-                  <TouchableOpacity className="bg-blueLight rounded-2xl px-4 py-3 flex-1">
-                    <View className="flex-row items-center justify-center">
-                      <Compass size={18} color="white" />
-                      <Text className="text-white font-sans font-semibold ml-2">Navigate To</Text>
-                    </View>
-                  </TouchableOpacity>
+
+                {/* compact identity + coords chips */}
+                <View className="flex-row gap-2 mb-4">
+                  <View className="bg-lightPurple/40 px-3 py-2 rounded-xl">
+                    <Text className="text-blue text-[11px]">ID</Text>
+                    <Text className="text-darkBlue font-bold">
+                      {labelFor(focusedBoat.boatId)}
+                    </Text>
+                  </View>
+                  <View className="bg-lightPurple/40 px-3 py-2 rounded-xl">
+                    <Text className="text-blue text-[11px]">Coords</Text>
+                    <Text className="text-darkBlue font-bold">
+                      {fmtCoord(focusedBoat.lat)}, {fmtCoord(focusedBoat.lng)}
+                    </Text>
+                  </View>
                 </View>
-                <TouchableOpacity 
+
+                {/* primary action */}
+                <TouchableOpacity
+                  className="bg-blueLight rounded-2xl px-4 py-3 mb-3"
+                  onPress={() => {
+                    const u = getUserInfo(focusedBoat.boatId);
+                    const lines = u
+                      ? [
+                          `Name: ${u.name}`,
+                          `NIC: ${u.nationalId}`,
+                          `Phone: ${u.phone}`,
+                          `Boat: ${u.boatName}`,
+                          `Address: ${u.homeAddress}`,
+                        ]
+                      : [`ID: ${labelFor(focusedBoat.boatId)}`];
+                    Alert.alert("Fisherman details", lines.join("\n"));
+                  }}
+                >
+                  <Text className="text-white font-sans font-semibold text-center">
+                    More info
+                  </Text>
+                </TouchableOpacity>
+
+                {/* 🆕 Only show triage actions if we have a real alertId */}
+                {focusedBoat?.alertId ? (
+                  <>
+                    <View className="flex-row justify-between mt-1">
+                      {/* remove this first button if you don't want Acknowledge in v1 */}
+                      <TouchableOpacity
+                        className="bg-red-600 rounded-xl px-3 py-3 flex-1 mr-2"
+                        onPress={() =>
+                          setSosUiStatus((s) => ({
+                            ...s,
+                            [focusedBoat.boatId]: "active",
+                            ...(focusedBoat.alertId ? { [focusedBoat.alertId]: "active" } : {}),
+                          }))
+                        }
+                      >
+                        <Text className="text-white font-semibold">
+                          Mark Active
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        className="bg-orange-500 rounded-xl px-3 py-3 flex-1 mx-2"
+                        onPress={() =>
+                          setSosUiStatus((s) => ({
+                            ...s,
+                            [focusedBoat.boatId]: "help-sent",
+                          }))
+                        }
+                      >
+                        <Text className="text-white font-semibold">
+                          Help sent
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        className="bg-green-600 rounded-xl px-3 py-3 flex-1 ml-2"
+                        onPress={() =>
+                          setSosUiStatus((s) => ({
+                            ...s,
+                            [focusedBoat.boatId]: "resolved",
+                          }))
+                        }
+                      >
+                        <Text className="text-white font-semibold">
+                          Resolved
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+
+                    {!!sosUiStatus[focusedBoat.boatId] && (
+                      <View className="items-center mt-3">
+                        <Text className="text-secondaryText text-xs mb-1">
+                          Current status
+                        </Text>
+                        <View className="bg-darkBlue/90 px-3 py-1 rounded-full">
+                          <Text className="text-white font-sans font-semibold text-xs">
+                            {sosUiStatus[focusedBoat.boatId].replace("-", " ")}
+                          </Text>
+                        </View>
+                      </View>
+                    )}
+                  </>
+                ) : (
+                  <Text className="text-accentText mt-3 text-center">
+                    No active SOS alert found for this boat.
+                  </Text>
+                )}
+                <TouchableOpacity
                   className="bg-blue rounded-2xl py-4 items-center shadow-xl"
                   onPress={() => setFocusedBoat(null)}
                   style={{
@@ -704,7 +1158,9 @@ return (
                     shadowRadius: 12,
                   }}
                 >
-                  <Text className="text-white font-heading font-bold text-lg">Close Details</Text>
+                  <Text className="text-white font-heading font-bold text-lg">
+                    Close Details
+                  </Text>
                 </TouchableOpacity>
               </>
             )}

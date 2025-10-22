@@ -19,6 +19,8 @@ import { gpsPost, gpsPut } from "../api/client";
 import { GPS_BASE } from "../api/config";
 import { uploadToCloudinary } from "../utils/uploadImage";
 import { Picker } from "@react-native-picker/picker";
+import { ensureProfile } from "../api/auth";
+
 
 export default function ReportViolationScreen() {
   // create vs edit
@@ -130,9 +132,14 @@ const handleImageUpload = async (uri) => {
     if (!violationType) return Alert.alert("Violation Type", "Please select a violation");
     if (!description) return Alert.alert("Description", "Please add a short description");
 
+    const auth = await ensureProfile();
+const idKey = auth.userId;  
+
     const payload = {
-      reporterId: "BOAT_TEMP_001",
-      boatId: "BOAT_TEMP_001",
+      //reporterId: "BOAT_TEMP_001",
+      //boatId: "BOAT_TEMP_001",
+       reporterId: idKey,
+ boatId: idKey,
       violationType,
       description,
       location: location || undefined,

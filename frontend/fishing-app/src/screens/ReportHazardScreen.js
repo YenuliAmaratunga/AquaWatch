@@ -16,6 +16,8 @@ import * as Location from "expo-location";
 import { uploadToCloudinary } from "../utils/uploadImage";
 import { gpsPost } from "../api/client";
 import { Picker } from "@react-native-picker/picker";
+import { ensureProfile } from "../api/auth";
+
 
 export default function ReportHazardScreen() {
   // ---- form state ----
@@ -116,8 +118,13 @@ const handleImageUpload = async (uri) => {
       return Alert.alert("Location needed", "Please capture your current location");
     }
 
+    const auth = await ensureProfile();
+ const idKey = auth.userId;  
+
+
     const payload = {
-      reporterId: "BOAT_TEMP_001",
+      //reporterId: "BOAT_TEMP_001",
+      reporterId: idKey,
       hazardType,       // 'debris' | 'oil spill' | 'weather' | 'navigation hazard' | 'other'
       description,
       location,         // { latitude, longitude }
@@ -158,9 +165,9 @@ const handleImageUpload = async (uri) => {
   // ---- options (must match strings your BE accepts) ----
   const HAZARD_OPTIONS = [
     { key: "debris", label: "Debris" },
-    { key: "oil spill", label: "Oil Spill" },
+    { key: "oil_spill", label: "Oil Spill" },
     { key: "weather", label: "Weather" },
-    { key: "navigation hazard", label: "Navigation" },
+    { key: "navigation_hazard", label: "Navigation" },
     { key: "other", label: "Other" },
   ];
 
