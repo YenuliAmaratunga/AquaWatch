@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
+import { Audio } from "expo-av";
 import MapView, { Marker } from "react-native-maps";
 import * as Location from "expo-location";
 //import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -27,6 +28,15 @@ const { width, height } = Dimensions.get("window");
 export default function GPSTrackingScreen({ navigation }) {
   const mapRef = useRef(null);
   const pulse = useRef(new Animated.Value(1)).current;
+  // Easy to change later (e.g., 10)
+  const COUNTDOWN_SECONDS = 5;
+
+  // Flashing ring animation during arming
+  const ringAnim = useRef(new Animated.Value(0)).current;
+  const ringLoopRef = useRef(null);
+
+  // Reusable beep sound
+  const beepRef = useRef(null);
 
   const [boatId, setBoatId] = useState(null); // nationalId stored as boatId in BE
   const [myPos, setMyPos] = useState(null); // { latitude, longitude }
@@ -64,100 +74,163 @@ export default function GPSTrackingScreen({ navigation }) {
     });
   };
 
-const startArming = () => {
-  setArming(true);
-  setCountdown(5);
+  // ---- AUDIO HELPERS ----
+  const loadBeep = async () => {
+    try {
+      if (beepRef.current) return;
+      // NOTE: adjust the path if your assets folder lives elsewhere
+      const beepModule = require("../assets/sounds/beep.mp3");
+      const { sound } = await Audio.Sound.createAsync(beepModule, {
+        volume: 1.0,
+        shouldPlay: false,
+      });
+      beepRef.current = sound;
+    } catch (e) {
+      console.log("[sos] beep load failed:", e?.message);
+    }
+  };
 
-  // Start vibration/haptics during countdown
-  if (Platform.OS === "android") {
-    // Android: loop a simple pattern until we cancel
-    Vibration.vibrate([0, 200, 300], true);
-  } else {
-    // iOS: immediate warning ping + periodic heavy pulses
-    if (hapticIntervalRef.current) clearInterval(hapticIntervalRef.current);
+  const playBeep = async () => {
+    try {
+      if (!beepRef.current) await loadBeep();
+      if (beepRef.current) await beepRef.current.replayAsync();
+    } catch (e) {
+      console.log("[sos] beep play failed:", e?.message);
+    }
+  };
 
-    // fire a "warning" haptic immediately (fallback to a short vibration if needed)
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning)
-      .catch(() => Vibration.vibrate(150));
+  const unloadBeep = async () => {
+    try {
+      if (beepRef.current) {
+        await beepRef.current.unloadAsync();
+        beepRef.current = null;
+      }
+    } catch (e) {
+      // ignore
+    }
+  };
 
-    hapticIntervalRef.current = setInterval(() => {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy)
-        .catch(() => Vibration.vibrate(100));
-    }, 800);
-  }
+  // ---- RING HELPERS ----
+  const startRing = () => {
+    try {
+      ringAnim.setValue(0);
+      ringLoopRef.current = Animated.loop(
+        Animated.timing(ringAnim, {
+          toValue: 1,
+          duration: 900,
+          useNativeDriver: true,
+        }),
+        { resetBeforeIteration: true }
+      );
+      ringLoopRef.current.start();
+    } catch (_) {}
+  };
 
-  if (armTimer.current) clearInterval(armTimer.current);
-  armTimer.current = setInterval(() => {
-    setCountdown((c) => {
-      if (c <= 1) {
-        // stop timers + haptics
-        if (armTimer.current) clearInterval(armTimer.current);
-        armTimer.current = null;
+  const stopRing = () => {
+    try {
+      if (ringLoopRef.current) {
+        ringLoopRef.current.stop();
+        ringLoopRef.current = null;
+      }
+      ringAnim.stopAnimation();
+      ringAnim.setValue(0);
+    } catch (_) {}
+  };
 
-        if (Platform.OS === "android") Vibration.cancel();
-        if (hapticIntervalRef.current) {
-          clearInterval(hapticIntervalRef.current);
-          hapticIntervalRef.current = null;
+  const startArming = () => {
+    setArming(true);
+    setCountdown(COUNTDOWN_SECONDS);
+
+    // Start visuals + first beep immediately
+    startRing();
+    playBeep();
+
+    // Start vibration/haptics during countdown (kept exactly as you had)
+    if (Platform.OS === "android") {
+      Vibration.vibrate([0, 200, 300], true);
+    } else {
+      if (hapticIntervalRef.current) clearInterval(hapticIntervalRef.current);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(
+        () => Vibration.vibrate(150)
+      );
+      hapticIntervalRef.current = setInterval(() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() =>
+          Vibration.vibrate(100)
+        );
+      }, 800);
+    }
+
+    if (armTimer.current) clearInterval(armTimer.current);
+    armTimer.current = setInterval(() => {
+      setCountdown((c) => {
+        if (c <= 1) {
+          // stop timers + haptics + visuals
+          if (armTimer.current) clearInterval(armTimer.current);
+          armTimer.current = null;
+          stopRing();
+
+          if (Platform.OS === "android") Vibration.cancel();
+          if (hapticIntervalRef.current) {
+            clearInterval(hapticIntervalRef.current);
+            hapticIntervalRef.current = null;
+          }
+
+          setArming(false);
+          setConfirmVisible(false);
+
+          // fire the SOS
+          doSendSOS();
+          return 0;
         }
 
-        setArming(false);
-        setConfirmVisible(false);
+        // Per-second beep
+        playBeep();
+        return c - 1;
+      });
+    }, 1000);
+  };
 
-        // fire the SOS
-        doSendSOS();
-        return 0;
-      }
-      return c - 1;
-    });
-  }, 1000);
-};
-
-
-const cancelArming = () => {
-  if (armTimer.current) clearInterval(armTimer.current);
-  armTimer.current = null;
-
-  // stop vibration/haptics immediately
-  if (Platform.OS === "android") Vibration.cancel();
-  if (hapticIntervalRef.current) {
-    clearInterval(hapticIntervalRef.current);
-    hapticIntervalRef.current = null;
-  }
-
-  setArming(false);
-  setCountdown(5);
-};
-
-
-useEffect(() => {
-  return () => {
+  const cancelArming = () => {
     if (armTimer.current) clearInterval(armTimer.current);
+    armTimer.current = null;
 
-    // ensure no lingering vibration/haptics
+    // stop visuals + vibration/haptics immediately
+    stopRing();
     if (Platform.OS === "android") Vibration.cancel();
     if (hapticIntervalRef.current) {
       clearInterval(hapticIntervalRef.current);
       hapticIntervalRef.current = null;
     }
+
+    setArming(false);
+    setCountdown(COUNTDOWN_SECONDS);
   };
-}, []);
 
+  useEffect(() => {
+    return () => {
+      if (armTimer.current) clearInterval(armTimer.current);
+      stopRing();
+      unloadBeep();
+      if (Platform.OS === "android") Vibration.cancel();
+      if (hapticIntervalRef.current) {
+        clearInterval(hapticIntervalRef.current);
+        hapticIntervalRef.current = null;
+      }
+    };
+  }, []);
 
-  // read auth once to get boatId (nationalId)
-  /* useEffect(() => {
+  useEffect(() => {
     (async () => {
       try {
-        const raw = await AsyncStorage.getItem("auth");
-        const auth = JSON.parse(raw || "{}");
-        const id =
-          auth?.user?.nationalId || auth?.boatId || auth?.userId || "BOAT_123"; // final fallback
-        setBoatId(id);
-        console.log("[gps] boatId:", id);
-      } catch (e) {
-        console.log("[gps] failed to load auth:", e?.message);
-      }
+        await Audio.setAudioModeAsync({
+          playsInSilentModeIOS: true,
+          staysActiveInBackground: false,
+          shouldDuckAndroid: true,
+        });
+      } catch (_) {}
     })();
-  }, []); */
+  }, []);
+
   useEffect(() => {
     (async () => {
       const auth = await ensureProfile();
@@ -290,10 +363,7 @@ useEffect(() => {
   }
 
   return (
-    <SafeAreaView
-      className="flex-1 bg-white"
-      style={{ paddingTop: 6 }}
-    >
+    <SafeAreaView className="flex-1 bg-white" style={{ paddingTop: 6 }}>
       {/* Header */}
       <View className="px-4 pb-2 items-center">
         <Text className="text-[20px] font-extrabold text-blue text-center">
@@ -677,26 +747,66 @@ useEffect(() => {
               </View>
             ) : (
               <>
-                {/* Countdown UI */}
+                {/* Countdown UI with flashing ring */}
                 <View
                   style={{
                     alignSelf: "center",
-                    width: 84,
-                    height: 84,
-                    borderRadius: 42,
-                    borderWidth: 6,
-                    borderColor: "#FECACA",
-                    alignItems: "center",
-                    justifyContent: "center",
                     marginBottom: 10,
+                    width: 110,
+                    height: 110,
+                    justifyContent: "center",
+                    alignItems: "center",
                   }}
                 >
-                  <Text
-                    style={{ fontSize: 30, fontWeight: "900", color: "#DC2626" }}
+                  {/* Flashing outer ring */}
+                  <Animated.View
+                    style={{
+                      position: "absolute",
+                      width: 110,
+                      height: 110,
+                      borderRadius: 55,
+                      borderWidth: 3,
+                      borderColor: "#FCA5A5",
+                      opacity: ringAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0.6, 0],
+                      }),
+                      transform: [
+                        {
+                          scale: ringAnim.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [0.9, 1.35],
+                          }),
+                        },
+                      ],
+                    }}
+                  />
+
+                  {/* Core circle */}
+                  <View
+                    style={{
+                      width: 84,
+                      height: 84,
+                      borderRadius: 42,
+                      borderWidth: 6,
+                      borderColor: "#FECACA",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      backgroundColor: "#FFFFFF",
+                    }}
                   >
-                    {countdown}
-                  </Text>
+                    <Text
+                      style={{
+                        fontSize: 30,
+                        fontWeight: "900",
+                        color: "#DC2626",
+                      }}
+                    >
+                      {countdown}
+                    </Text>
+                  </View>
                 </View>
+
                 <Text
                   style={{
                     textAlign: "center",
