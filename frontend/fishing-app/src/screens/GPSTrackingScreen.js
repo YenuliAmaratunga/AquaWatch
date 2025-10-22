@@ -10,8 +10,10 @@ import {
   Easing,
   Platform,
   Modal,
+  Vibration,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import * as Haptics from "expo-haptics";
 import MapView, { Marker } from "react-native-maps";
 import * as Location from "expo-location";
 //import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -37,6 +39,7 @@ export default function GPSTrackingScreen({ navigation }) {
   const [arming, setArming] = useState(false);
   const [countdown, setCountdown] = useState(5);
   const armTimer = useRef(null);
+  const hapticIntervalRef = useRef(null);
 
   // --- UI: Success / error notice banner ---
   const [notice, setNotice] = useState(null); // { type: 'success'|'error'|'info', text: string }
@@ -61,39 +64,84 @@ export default function GPSTrackingScreen({ navigation }) {
     });
   };
 
-  const startArming = () => {
-    setArming(true);
-    setCountdown(5);
-    if (armTimer.current) clearInterval(armTimer.current);
-    armTimer.current = setInterval(() => {
-      setCountdown((c) => {
-        if (c <= 1) {
-          if (armTimer.current) clearInterval(armTimer.current);
-          armTimer.current = null;
-          setArming(false);
-          setConfirmVisible(false);
-          // fire the SOS
-          doSendSOS();
-          return 0;
+const startArming = () => {
+  setArming(true);
+  setCountdown(5);
+
+  // Start vibration/haptics during countdown
+  if (Platform.OS === "android") {
+    // Android: loop a simple pattern until we cancel
+    Vibration.vibrate([0, 200, 300], true);
+  } else {
+    // iOS: immediate warning ping + periodic heavy pulses
+    if (hapticIntervalRef.current) clearInterval(hapticIntervalRef.current);
+
+    // fire a "warning" haptic immediately (fallback to a short vibration if needed)
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning)
+      .catch(() => Vibration.vibrate(150));
+
+    hapticIntervalRef.current = setInterval(() => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy)
+        .catch(() => Vibration.vibrate(100));
+    }, 800);
+  }
+
+  if (armTimer.current) clearInterval(armTimer.current);
+  armTimer.current = setInterval(() => {
+    setCountdown((c) => {
+      if (c <= 1) {
+        // stop timers + haptics
+        if (armTimer.current) clearInterval(armTimer.current);
+        armTimer.current = null;
+
+        if (Platform.OS === "android") Vibration.cancel();
+        if (hapticIntervalRef.current) {
+          clearInterval(hapticIntervalRef.current);
+          hapticIntervalRef.current = null;
         }
-        return c - 1;
-      });
-    }, 1000);
-  };
 
-  const cancelArming = () => {
+        setArming(false);
+        setConfirmVisible(false);
+
+        // fire the SOS
+        doSendSOS();
+        return 0;
+      }
+      return c - 1;
+    });
+  }, 1000);
+};
+
+
+const cancelArming = () => {
+  if (armTimer.current) clearInterval(armTimer.current);
+  armTimer.current = null;
+
+  // stop vibration/haptics immediately
+  if (Platform.OS === "android") Vibration.cancel();
+  if (hapticIntervalRef.current) {
+    clearInterval(hapticIntervalRef.current);
+    hapticIntervalRef.current = null;
+  }
+
+  setArming(false);
+  setCountdown(5);
+};
+
+
+useEffect(() => {
+  return () => {
     if (armTimer.current) clearInterval(armTimer.current);
-    armTimer.current = null;
-    setArming(false);
-    setCountdown(5);
-  };
 
-  // cleanup timer on unmount
-  useEffect(() => {
-    return () => {
-      if (armTimer.current) clearInterval(armTimer.current);
-    };
-  }, []);
+    // ensure no lingering vibration/haptics
+    if (Platform.OS === "android") Vibration.cancel();
+    if (hapticIntervalRef.current) {
+      clearInterval(hapticIntervalRef.current);
+      hapticIntervalRef.current = null;
+    }
+  };
+}, []);
+
 
   // read auth once to get boatId (nationalId)
   /* useEffect(() => {
