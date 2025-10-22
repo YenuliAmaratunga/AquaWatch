@@ -106,24 +106,31 @@ export default function PoliceDashboard() {
 
   // must build sosList first
   const sosList = useMemo(() => {
-    return alerts
+    const base = alerts
       .map((a) => {
         const boatId = a.boatId || a.reporterId || "UNKNOWN";
         return {
           id: a._id,
           alertId: a._id,
           boatId,
-          //lat: a.location?.latitude,
-          //lng: a.location?.longitude,
-           lat: toNum(a.location?.latitude),
- lng: toNum(a.location?.longitude),
+          lat: toNum(a.location?.latitude),
+          lng: toNum(a.location?.longitude),
           status: a.status || "active",
           when: a.timestamp,
           label: labelFor(boatId),
         };
       })
-      //.filter((a) => typeof a.lat === "number" && typeof a.lng === "number");
       .filter((a) => a.lat != null && a.lng != null);
+
+    // Dedupe by boatId: keep the most recent alert (by timestamp)
+    const byBoat = new Map();
+    for (const it of base) {
+      const prev = byBoat.get(it.boatId);
+      const t = new Date(it.when || 0).getTime();
+      const pt = new Date(prev?.when || 0).getTime();
+      if (!prev || t > pt) byBoat.set(it.boatId, it);
+    }
+    return Array.from(byBoat.values());
   }, [alerts]);
 
   // decorate with local triage status
@@ -394,7 +401,7 @@ export default function PoliceDashboard() {
               <View className="flex-1">
                 <Text className="text-white font-heading font-bold text-xl">
                   Active SOS Alerts:{" "}
-                  {loadingAlerts ? "..." : filteredSos.length}
+                  {loadingAlerts ? "..." : sosList.length}
                 </Text>
                 <Text className="text-white/90 text-sm font-sans mt-1">
                   Emergency situations requiring immediate attention
@@ -470,9 +477,7 @@ export default function PoliceDashboard() {
                       ? { bg: "bg-green-600", label: "Resolved" }
                       : s === "help-sent"
                         ? { bg: "bg-orange-500", label: "Help sent" }
-                        : s === "acknowledged"
-                          ? { bg: "bg-yellow-500", label: "Acknowledged" }
-                          : { bg: "bg-red-600", label: "Active" };
+                        : { bg: "bg-red-600", label: "Active" };
                   const chip = statusToChip(item.localStatus);
 
                   return (
@@ -513,7 +518,7 @@ export default function PoliceDashboard() {
                         }, 250);
                       }}
                     >
-                      <View className="flex-row items-center mb-3">
+                      <View className="flex-row items-center justify-between mb-3">
                         <View className="bg-red-100 rounded-full p-3 mr-4">
                           <AlertTriangle color="#DC2626" size={24} />
                         </View>
@@ -521,9 +526,11 @@ export default function PoliceDashboard() {
                           <Text className="text-darkBlue font-heading font-bold text-xl">
                             {item.label}
                           </Text>
-                          <Text className="text-red-600 font-sans font-semibold text-lg">
-                            EMERGENCY SOS
-                          </Text>
+                          <View className="self-start bg-red-600/90 px-3 py-1 rounded-full">
+                            <Text className="text-white font-sans font-semibold text-xs">
+                              SOS
+                            </Text>
+                          </View>
                         </View>
                       </View>
 
@@ -577,7 +584,14 @@ export default function PoliceDashboard() {
             }}
           >
             {boats.map((b) => {
-              const isSOS = (b.status || "").toLowerCase() === "sos";
+              //const isSOS = (b.status || "").toLowerCase() === "sos";
+              const isSOS =
+                (b.status || "").toLowerCase() === "sos" ||
+                alerts.some(
+                  (a) =>
+                    (a.boatId || a.reporterId) === b.boatId &&
+                    (a.status || "").toLowerCase() === "active"
+                );
               return (
                 <Marker
                   //key={`${b.boatId}-${b.lat}-${b.lng}`}
@@ -626,11 +640,11 @@ export default function PoliceDashboard() {
                             style={{
                               color: "#DC2626",
                               marginLeft: 6,
-                              fontWeight: "600",
+                              fontWeight: "700",
                               fontSize: 14,
                             }}
                           >
-                            Active Emergency
+                            SOS
                           </Text>
                         </View>
                       )}
@@ -1016,103 +1030,124 @@ export default function PoliceDashboard() {
           >
             {focusedBoat && (
               <>
-                <View className="flex-row items-center justify-between mb-4">
+                <View className="flex-row items-center justify-between mb-3">
                   <Text className="text-darkBlue font-heading font-bold text-2xl">
                     {focusedBoat.name || "Selected Boat"}
                   </Text>
                   {(focusedBoat.status || "").toLowerCase() === "sos" && (
                     <View className="bg-red-600 rounded-full px-3 py-1">
-                      <Text className="text-white text-sm font-sans font-bold">
-                        🚨 SOS
+                      <Text className="text-white text-xs font-sans font-bold">
+                        SOS
                       </Text>
                     </View>
                   )}
                 </View>
-                <Text className="text-secondaryText font-sans text-base mb-6">
-                  📍 {fmtCoord(focusedBoat.lat)}, {fmtCoord(focusedBoat.lng)}
-                </Text>
-                <View className="mb-4">
-                  <TouchableOpacity
-                    className="bg-blueLight rounded-2xl px-4 py-3"
-                    onPress={() => {
-                      const u = getUserInfo(focusedBoat.boatId);
-                      const lines = u
-                        ? [
-                            `Name: ${u.name}`,
-                            `NIC: ${u.nationalId}`,
-                            `Phone: ${u.phone}`,
-                            `Boat: ${u.boatName}`,
-                            `Address: ${u.homeAddress}`,
-                          ]
-                        : [`ID: ${labelFor(focusedBoat.boatId)}`];
-                      Alert.alert("Fisherman details", lines.join("\n"));
-                    }}
-                  >
-                    <Text className="text-white font-sans font-semibold text-center">
-                      More info
+
+                {/* compact identity + coords chips */}
+                <View className="flex-row gap-2 mb-4">
+                  <View className="bg-lightPurple/40 px-3 py-2 rounded-xl">
+                    <Text className="text-blue text-[11px]">ID</Text>
+                    <Text className="text-darkBlue font-bold">
+                      {labelFor(focusedBoat.boatId)}
                     </Text>
-                  </TouchableOpacity>
-
-                  {/* 🆕 Only show triage actions if we have a real alertId */}
-                  {focusedBoat?.alertId ? (
-                    <>
-                      <View className="flex-row justify-between mt-3">
-                        {/* remove this first button if you don't want Acknowledge in v1 */}
-                        <TouchableOpacity
-                          className="bg-yellow-500 rounded-xl px-3 py-2"
-                          onPress={() =>
-                            setSosUiStatus((s) => ({
-                              ...s,
-                              [focusedBoat.boatId]: "acknowledged",
-                            }))
-                          }
-                        >
-                          <Text className="text-white font-semibold">
-                            Acknowledge
-                          </Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                          className="bg-orange-500 rounded-xl px-3 py-2"
-                          onPress={() =>
-                            setSosUiStatus((s) => ({
-                              ...s,
-                              [focusedBoat.boatId]: "help-sent",
-                            }))
-                          }
-                        >
-                          <Text className="text-white font-semibold">
-                            Help sent
-                          </Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                          className="bg-green-600 rounded-xl px-3 py-2"
-                          onPress={() =>
-                            setSosUiStatus((s) => ({
-                              ...s,
-                              [focusedBoat.boatId]: "resolved",
-                            }))
-                          }
-                        >
-                          <Text className="text-white font-semibold">
-                            Resolved
-                          </Text>
-                        </TouchableOpacity>
-                      </View>
-
-                      {!!sosUiStatus[focusedBoat.boatId] && (
-                        <Text className="text-accentText mt-3 text-center">
-                          Status: {sosUiStatus[focusedBoat.boatId]}
-                        </Text>
-                      )}
-                    </>
-                  ) : (
-                    <Text className="text-accentText mt-3 text-center">
-                      No active SOS alert found for this boat.
+                  </View>
+                  <View className="bg-lightPurple/40 px-3 py-2 rounded-xl">
+                    <Text className="text-blue text-[11px]">Coords</Text>
+                    <Text className="text-darkBlue font-bold">
+                      {fmtCoord(focusedBoat.lat)}, {fmtCoord(focusedBoat.lng)}
                     </Text>
-                  )}
+                  </View>
                 </View>
+
+                {/* primary action */}
+                <TouchableOpacity
+                  className="bg-blueLight rounded-2xl px-4 py-3 mb-3"
+                  onPress={() => {
+                    const u = getUserInfo(focusedBoat.boatId);
+                    const lines = u
+                      ? [
+                          `Name: ${u.name}`,
+                          `NIC: ${u.nationalId}`,
+                          `Phone: ${u.phone}`,
+                          `Boat: ${u.boatName}`,
+                          `Address: ${u.homeAddress}`,
+                        ]
+                      : [`ID: ${labelFor(focusedBoat.boatId)}`];
+                    Alert.alert("Fisherman details", lines.join("\n"));
+                  }}
+                >
+                  <Text className="text-white font-sans font-semibold text-center">
+                    More info
+                  </Text>
+                </TouchableOpacity>
+
+                {/* 🆕 Only show triage actions if we have a real alertId */}
+                {focusedBoat?.alertId ? (
+                  <>
+                    <View className="flex-row justify-between mt-1">
+                      {/* remove this first button if you don't want Acknowledge in v1 */}
+                      <TouchableOpacity
+                        className="bg-red-600 rounded-xl px-3 py-3 flex-1 mr-2"
+                        onPress={() =>
+                          setSosUiStatus((s) => ({
+                            ...s,
+                            [focusedBoat.boatId]: "active",
+                            ...(focusedBoat.alertId ? { [focusedBoat.alertId]: "active" } : {}),
+                          }))
+                        }
+                      >
+                        <Text className="text-white font-semibold">
+                          Mark Active
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        className="bg-orange-500 rounded-xl px-3 py-3 flex-1 mx-2"
+                        onPress={() =>
+                          setSosUiStatus((s) => ({
+                            ...s,
+                            [focusedBoat.boatId]: "help-sent",
+                          }))
+                        }
+                      >
+                        <Text className="text-white font-semibold">
+                          Help sent
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        className="bg-green-600 rounded-xl px-3 py-3 flex-1 ml-2"
+                        onPress={() =>
+                          setSosUiStatus((s) => ({
+                            ...s,
+                            [focusedBoat.boatId]: "resolved",
+                          }))
+                        }
+                      >
+                        <Text className="text-white font-semibold">
+                          Resolved
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+
+                    {!!sosUiStatus[focusedBoat.boatId] && (
+                      <View className="items-center mt-3">
+                        <Text className="text-secondaryText text-xs mb-1">
+                          Current status
+                        </Text>
+                        <View className="bg-darkBlue/90 px-3 py-1 rounded-full">
+                          <Text className="text-white font-sans font-semibold text-xs">
+                            {sosUiStatus[focusedBoat.boatId].replace("-", " ")}
+                          </Text>
+                        </View>
+                      </View>
+                    )}
+                  </>
+                ) : (
+                  <Text className="text-accentText mt-3 text-center">
+                    No active SOS alert found for this boat.
+                  </Text>
+                )}
                 <TouchableOpacity
                   className="bg-blue rounded-2xl py-4 items-center shadow-xl"
                   onPress={() => setFocusedBoat(null)}
