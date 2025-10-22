@@ -114,74 +114,37 @@ export default function WeatherForecastScreen() {
       <View
         style={{
           flex: 1,
-          backgroundColor: "#fff",
-          padding: 16,
-          paddingTop: 48,
+          justifyContent: "center",
+          alignItems: "center",
+          backgroundColor: "white",
         }}
       >
-        {/* Location Skeleton */}
-        <Animatable.View
-          animation="pulse"
+        <Animatable.View animation="pulse" iterationCount="infinite">
+          <MaterialCommunityIcons
+            name="weather-sunny"
+            size={70}
+            color="#3C467B"
+            style={{ marginBottom: 10 }}
+          />
+        </Animatable.View>
+        <Animatable.Text
+          animation="fadeIn"
           iterationCount="infinite"
+          duration={2000}
           style={{
-            backgroundColor: "#E5E7EB",
-            height: 24,
-            width: "70%",
-            borderRadius: 4,
-            alignSelf: "center",
-            marginBottom: 24,
+            color: "#3C467B",
+            fontSize: 16,
+            fontWeight: "600",
+            marginTop: 8,
           }}
+        >
+          Fetching Weather Data...
+        </Animatable.Text>
+        <ActivityIndicator
+          size="large"
+          color="#636CCB"
+          style={{ marginTop: 12 }}
         />
-
-        {/* Current Conditions Card Skeleton */}
-        <View
-          style={{
-            backgroundColor: "#F3F4F6",
-            borderRadius: 20,
-            padding: 16,
-            marginBottom: 24,
-          }}
-        >
-          <View
-            style={{
-              flexDirection: "row",
-              justifyContent: "center",
-              marginBottom: 16,
-            }}
-          >
-            <Animatable.View
-              animation="pulse"
-              iterationCount="infinite"
-              style={{
-                backgroundColor: "#E5E7EB",
-                height: 24,
-                width: "40%",
-                borderRadius: 4,
-              }}
-            />
-          </View>
-          <SkeletonRow />
-          <SkeletonRow />
-          <SkeletonRow />
-          <SkeletonRow />
-        </View>
-
-        {/* Forecast Cards Skeleton */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={{ marginTop: 16 }}
-        >
-          {[1, 2, 3].map((_, idx) => (
-            <SkeletonCard
-              key={idx}
-              style={{
-                width: 170,
-                marginRight: 12,
-              }}
-            />
-          ))}
-        </ScrollView>
       </View>
     );
 
@@ -471,7 +434,7 @@ export default function WeatherForecastScreen() {
               />
               <Row
                 icon="weather-windy"
-                label="Wind Wave"
+                label="Wind Wave "
                 value={`${marine.daily.wind_wave_height_max[idx] ?? "--"} m`}
               />
             </LinearGradient>
