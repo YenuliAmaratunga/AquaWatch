@@ -405,35 +405,43 @@ exports.viewTrip = async (req, res) => {
 };
 
 
+// trip.controller.js
 exports.updateBoatLocation = async (req, res) => {
   try {
     const { tripId } = req.params;
     const { latitude, longitude } = req.body;
 
-    if (!latitude || !longitude) {
-      return res.status(400).json({ message: "Latitude and longitude required" });
+    // validate coords (allow 0.0)
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+      return res.status(400).json({ message: "Valid latitude and longitude are required" });
     }
 
-    const trip = await Trip.findByIdAndUpdate(
-      tripId,
-      {
-        currentLocation: {
-          latitude,
-          longitude,
-          updatedAt: new Date(),
-        },
-      },
-      { new: true }
-    );
-
+    const trip = await Trip.findById(tripId);
     if (!trip) return res.status(404).json({ message: "Trip not found" });
 
-    res.json({ success: true, currentLocation: trip.currentLocation });
+    // 🔒 Only the fisherman who created the trip can update
+    if (trip.fishermanId.toString() !== req.user.id) {
+      return res.status(403).json({ message: "Not authorized to update this trip" });
+    }
+
+    trip.currentLocation = {
+      latitude,
+      longitude,
+      updatedAt: new Date(),
+    };
+    await trip.save();
+
+    return res.json({
+      success: true,
+      message: "Boat location updated",
+      currentLocation: trip.currentLocation,
+    });
   } catch (error) {
-    console.error("Error updating location:", error);
-    res.status(500).json({ message: "Server error" });
+    console.error("Error updating boat location:", error);
+    return res.status(500).json({ message: "Server error" });
   }
 };
+
 
 exports.getBoatLocation = async (req, res) => {
   try {

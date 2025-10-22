@@ -9,7 +9,7 @@ route.get('/latestTrip', authMiddleware, getLatestTrip);
 route.get("/myTrips", authMiddleware, getAllTripsByFisherman);
 route.put("/end", authMiddleware, endTrip);
 route.get("/view/:tripId", viewTrip);
-route.put("/updateLocation/:tripId",updateBoatLocation);
+route.put("/updateLocation/:tripId",authMiddleware,updateBoatLocation);
 route.get("/location/:tripId",getBoatLocation);
 
 

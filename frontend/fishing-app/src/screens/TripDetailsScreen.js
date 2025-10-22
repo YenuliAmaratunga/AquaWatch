@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import {
   View,
   Text,
@@ -6,16 +6,25 @@ import {
   ScrollView,
   ImageBackground,
   ActivityIndicator,
+  Alert,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import * as Location from "expo-location";
 import QRCode from "react-native-qrcode-svg";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import axios from "axios";
+
+const API_BASE =
+  "https://10b8c329-d78f-4b7f-8cd9-448ba1dae2e2-dev.e1-us-east-azure.choreoapis.dev/aquawatchapp/registration-service/v1.0";
 
 export default function TripDetailsScreen({ route }) {
   const { trip } = route.params;
   const [startLocationName, setStartLocationName] = useState("");
   const [loadingLocation, setLoadingLocation] = useState(true);
+  const [trackingActive, setTrackingActive] = useState(false);
+  const watchRef = useRef(null);
 
+  // 1️⃣ Fetch readable start location
   useEffect(() => {
     const fetchLocationName = async () => {
       try {
@@ -40,6 +49,75 @@ export default function TripDetailsScreen({ route }) {
     fetchLocationName();
   }, []);
 
+  // 2️⃣ Start GPS tracking (only for the logged-in fisherman)
+  useEffect(() => {
+    let cancelled = false;
+
+    const startTracking = async () => {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== "granted") {
+          Alert.alert("Permission Denied", "GPS permission is required for tracking.");
+          return;
+        }
+
+        const authData = await AsyncStorage.getItem("authData");
+        const parsed = authData ? JSON.parse(authData) : null;
+        const token = parsed?.token;
+        if (!token) {
+          Alert.alert("Authentication Error", "User not logged in.");
+          return;
+        }
+
+        setTrackingActive(true);
+
+        // Start watching location
+        const sub = await Location.watchPositionAsync(
+          {
+            accuracy: Location.Accuracy.Highest,
+            timeInterval: 10000, // every 10 seconds
+            distanceInterval: 20, // or every 20 meters
+          },
+          async (loc) => {
+            if (cancelled) return;
+
+            const { latitude, longitude } = loc.coords;
+            console.log("📡 New coordinates:", latitude, longitude);
+
+            try {
+              await axios.put(
+                `${API_BASE}/api/Trip/updateLocation/${trip._id}`,
+                { latitude, longitude },
+                { headers: { Authorization: `Bearer ${token}` } }
+              );
+              console.log("✅ Boat location updated successfully!");
+            } catch (err) {
+              console.log("❌ Error sending location:", err?.response?.status || err.message);
+            }
+          }
+        );
+
+        watchRef.current = sub;
+      } catch (err) {
+        console.log("Error initializing GPS tracking:", err);
+      }
+    };
+
+    // start tracking only for ongoing trips
+    if (!trip?.endDate) startTracking();
+
+    // cleanup when leaving screen
+    return () => {
+      cancelled = true;
+      if (watchRef.current?.remove) {
+        watchRef.current.remove();
+        watchRef.current = null;
+      }
+      setTrackingActive(false);
+    };
+  }, [trip._id, trip.endDate]);
+
+  // 3️⃣ UI
   return (
     <ScrollView style={styles.container}>
       {/* Header */}
@@ -87,6 +165,16 @@ export default function TripDetailsScreen({ route }) {
             {new Date(trip.startDate).toLocaleDateString()} {trip.startTime || ""}
           </Text>
         </View>
+
+        {trackingActive ? (
+          <Text style={{ color: "green", textAlign: "center", marginTop: 10 }}>
+            🛰️ GPS tracking active...
+          </Text>
+        ) : (
+          <Text style={{ color: "red", textAlign: "center", marginTop: 10 }}>
+            ⚠️ GPS tracking not started
+          </Text>
+        )}
       </View>
 
       {/* Crew Members */}
@@ -112,6 +200,7 @@ export default function TripDetailsScreen({ route }) {
   );
 }
 
+// 4️⃣ Styles
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#eef3f9" },
   header: { height: 220, justifyContent: "flex-end" },
