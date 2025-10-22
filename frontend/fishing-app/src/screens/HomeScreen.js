@@ -1,11 +1,12 @@
 import React, { useState } from "react";
 import { View, Text, TouchableOpacity, Alert } from "react-native";
 import { useNavigation } from "@react-navigation/native";
+import { Ionicons } from "@expo/vector-icons";
 import {
   IdCard,
   ShieldAlert,
   CloudSun,
-  Locate
+  Locate,
 } from "lucide-react-native";
 
 const cardData = {
@@ -13,7 +14,7 @@ const cardData = {
     { id: 1, title: "Registration & QR", bg: "bg-darkPurple", screen: "Fisherman", icon: IdCard },
     { id: 2, title: "Safety & Risk", bg: "bg-darkPurple", screen: "Risk", icon: ShieldAlert },
     { id: 3, title: "Weather Forecast", bg: "bg-darkPurple", screen: "Weather", icon: CloudSun },
-    { id: 4, title: "SOS & Reporting", bg: "bg-darkPurple", screen: "GPS", icon: Locate }
+    { id: 4, title: "SOS & Reporting", bg: "bg-darkPurple", screen: "GPS", icon: Locate },
   ],
   si: [
     { id: 1, title: "ලියාපදිංචි කිරීම & QR", bg: "bg-lightGreen", screen: "Fisherman", icon: IdCard },
@@ -41,19 +42,17 @@ export default function HomeScreen() {
 
   const handleLogout = () => {
     Alert.alert("Logout", "You have been logged out.");
-    // navigation.navigate("Login"); // Uncomment if login exists
+    // navigation.navigate("Login");
   };
 
   return (
     <View className="flex-1 bg-white px-4 pt-16">
-      {/* Top bar: Welcome left, Lang + Logout right */}
+      {/* Top Bar */}
       <View className="flex-row justify-between items-center mb-6">
-        {/* Welcome text */}
         <Text className="text-2xl font-bold text-darkBlue">
           {labels[language].dashboard}
         </Text>
 
-        {/* Language selector + Logout */}
         <View className="flex-row items-center space-x-2">
           {["en", "si", "ta"].map((lang) => (
             <TouchableOpacity
@@ -73,7 +72,6 @@ export default function HomeScreen() {
             </TouchableOpacity>
           ))}
 
-          {/* Logout Button in purple */}
           <TouchableOpacity
             onPress={handleLogout}
             className="ml-2 px-4 py-2 bg-darkPurple rounded-lg"
@@ -83,7 +81,7 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      {/* Grid section with equal spacing */}
+      {/* Grid Section */}
       <View className="flex-1 justify-evenly">
         <View className="flex-row flex-wrap justify-between">
           {cardData[language].map((card) => {
@@ -106,6 +104,32 @@ export default function HomeScreen() {
             );
           })}
         </View>
+
+        {/* 👇 AI Safety Button added here */}
+        <TouchableOpacity
+          onPress={() => navigation.navigate("AIFeaturesMenu")}
+          style={{
+            backgroundColor: "#636CCB",
+            padding: 15,
+            borderRadius: 12,
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+            marginTop: 20,
+          }}
+        >
+          <Ionicons name="brain" size={24} color="#fff" />
+          <Text
+            style={{
+              color: "#fff",
+              fontSize: 16,
+              fontWeight: "bold",
+              marginLeft: 10,
+            }}
+          >
+            🤖 AI Safety Features
+          </Text>
+        </TouchableOpacity>
       </View>
     </View>
   );

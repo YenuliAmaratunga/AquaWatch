@@ -31,6 +31,15 @@ import MyReports from "../screens/MyReports";
 import BoatTabsScreen from "../screens/BoatTabsScreen";
 import BoatListScreen from "../screens/BoatListScreen";
 import BoatDetailsScreen from "../screens/BoatDetailsScreen";
+import TripsScreen from "../screens/TripsScreen";
+import TripDetailsScreen from "../screens/TripDetailsScreen";
+import TripTabsScreen from "../screens/TripTabsScreen";
+
+// AI Safety & Risk Analysis Screens
+import AIFeaturesMenu from "../screens/AIFeaturesMenu";
+import RiskAssessmentDashboard from "../screens/RiskAssessmentDashboard";
+import TripSafetyValidator from "../screens/TripSafetyValidator";
+import SafetyAnalyticsScreen from "../screens/SafetyAnalyticsScreen";
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -92,7 +101,16 @@ export default function AppNavigator() {
         <Stack.Screen name = "Fisherman" component={FishermanLandingScreen}/>
         <Stack.Screen name = "Boat" component={BoatTabsScreen}/>
         <Stack.Screen name="BoatListScreen" component={BoatListScreen} />
+        <Stack.Screen name = "TripList" component={TripsScreen}/>
+        <Stack.Screen name = "TripDetails" component={TripDetailsScreen}/>
       <Stack.Screen name="BoatDetailsScreen" component={BoatDetailsScreen} />
+      <Stack.Screen name="Trips" component={TripTabsScreen}/>
+      
+      {/* AI Safety & Risk Analysis Screens */}
+      <Stack.Screen name="AIFeaturesMenu" component={AIFeaturesMenu} />
+      <Stack.Screen name="RiskAssessmentDashboard" component={RiskAssessmentDashboard} />
+      <Stack.Screen name="TripSafetyValidator" component={TripSafetyValidator} />
+      <Stack.Screen name="SafetyAnalytics" component={SafetyAnalyticsScreen} />
 
         
       </Stack.Navigator>

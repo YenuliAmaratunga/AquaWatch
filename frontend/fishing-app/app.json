@@ -7,27 +7,28 @@
     "icon": "src/assets/AppLogo.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
+
     "ios": {
-      "supportsTablet": true
-    },
+  "supportsTablet": true,
+  "infoPlist": {
+    "NSPhotoLibraryAddUsageDescription": "AquaWatch saves your trip QR codes to your photo gallery."
+    
+  }
+},
+
     "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "src/assets/icon.png",
-        "backgroundColor": "#004675"
-      },
-      "permissions": [
-        "CAMERA",
-        "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE",
-        "READ_MEDIA_IMAGES",
-        "READ_MEDIA_VIDEO",
-        "READ_MEDIA_AUDIO",
-        "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION"
-      ],
-      "edgeToEdgeEnabled": true,
-      "package": "com.anonymous.AquaWatch"
-    },
+  "adaptiveIcon": {
+    "foregroundImage": "src/assets/icon.png",
+    "backgroundColor": "#004675"
+  },
+  "permissions": [
+    "READ_MEDIA_IMAGES",
+    "ACCESS_FINE_LOCATION"
+  ],
+  "edgeToEdgeEnabled": true,
+  "package": "com.anonymous.AquaWatch"
+},
+
     "web": {
       "favicon": "src/assets/icon.png",
       "bundler": "metro"

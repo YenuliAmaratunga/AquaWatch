@@ -22,10 +22,31 @@ const TripSchema = new mongoose.Schema(
       longitude: { type: Number, required: true },
     },
     heading: { type: Number, required: true },
+
+    startDate: { type: Date, required: true, default: Date.now },
+    startTime: { type: String }, 
+    endDate: { type: Date },
+    endTime: { type: String }, 
+
+    currentLocation: {
+    latitude: { type: Number, default: null },
+    longitude: { type: Number, default: null },
+    updatedAt: { type: Date, default: null },
   },
+
+    shareToken: { type: String, allowNull: false, unique: true },
+    qrData: { type: String, allowNull: false },
+    qrGeneratedAt: { type: Date, defaultValue: Date.now },
+
+
+    
+  },
+  
   {
     timestamps: true, 
-  }
+  },
+
+  
 );
 
 module.exports = mongoose.model("Trip", TripSchema);
