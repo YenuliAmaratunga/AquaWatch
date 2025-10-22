@@ -359,44 +359,91 @@ exports.viewTrip = async (req, res) => {
           </div>
         </div>
 
-        <script>
-          const map = L.map('map').setView(
-            [${trip.startingLocation.latitude}, ${trip.startingLocation.longitude}],
-            8
-          );
+       <script>
+  const map = L.map('map').setView(
+    [${trip.startingLocation.latitude}, ${trip.startingLocation.longitude}],
+    8
+  );
 
-          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap contributors'
-          }).addTo(map);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap contributors'
+  }).addTo(map);
 
-          // Starting point marker
-          L.marker([${trip.startingLocation.latitude}, ${trip.startingLocation.longitude}])
-            .addTo(map)
-            .bindPopup('Starting Point').openPopup();
+  const boatIcon = L.icon({
+    iconUrl: 'https://cdn-icons-png.flaticon.com/512/684/684908.png',
+    iconSize: [30, 30],
+  });
 
-          // User current location (GPS)
-          if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(
-              (pos) => {
-                const lat = pos.coords.latitude;
-                const lon = pos.coords.longitude;
-                L.marker([lat, lon], {
-                  icon: L.icon({
-                    iconUrl: 'https://cdn-icons-png.flaticon.com/512/684/684908.png',
-                    iconSize: [28, 28],
-                  }),
-                }).addTo(map).bindPopup('Your Location');
-                map.setView([lat, lon], 10);
-              },
-              (err) => console.warn("GPS permission denied", err)
-            );
-          }
-        </script>
+  const boatMarker = L.marker([${trip.startingLocation.latitude}, ${trip.startingLocation.longitude}], {
+    icon: boatIcon
+  }).addTo(map).bindPopup('Boat');
+
+  async function updateBoatPosition() {
+    try {
+      const res = await fetch('/api/Trip/location/${trip._id}');
+      const data = await res.json();
+
+      if (data?.latitude && data?.longitude) {
+        boatMarker.setLatLng([data.latitude, data.longitude]);
+      }
+    } catch (err) {
+      console.error("Error fetching location", err);
+    }
+  }
+
+  // update every 10s
+  setInterval(updateBoatPosition, 10000);
+</script>
+
       </body>
       </html>
     `);
   } catch (error) {
     console.error("Error in viewTrip:", error);
     res.status(500).send("<h2>Server error retrieving trip details</h2>");
+  }
+};
+
+
+exports.updateBoatLocation = async (req, res) => {
+  try {
+    const { tripId } = req.params;
+    const { latitude, longitude } = req.body;
+
+    if (!latitude || !longitude) {
+      return res.status(400).json({ message: "Latitude and longitude required" });
+    }
+
+    const trip = await Trip.findByIdAndUpdate(
+      tripId,
+      {
+        currentLocation: {
+          latitude,
+          longitude,
+          updatedAt: new Date(),
+        },
+      },
+      { new: true }
+    );
+
+    if (!trip) return res.status(404).json({ message: "Trip not found" });
+
+    res.json({ success: true, currentLocation: trip.currentLocation });
+  } catch (error) {
+    console.error("Error updating location:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+exports.getBoatLocation = async (req, res) => {
+  try {
+    const { tripId } = req.params;
+    const trip = await Trip.findById(tripId);
+    if (!trip || !trip.currentLocation)
+      return res.status(404).json({ message: "Location not found" });
+    res.json(trip.currentLocation);
+  } catch (err) {
+    console.error("Error fetching boat location:", err);
+    res.status(500).json({ message: "Server error" });
   }
 };
