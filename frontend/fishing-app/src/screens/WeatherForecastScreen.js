@@ -5,10 +5,10 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   ScrollView,
+  RefreshControl,
   LayoutAnimation,
   Platform,
   UIManager,
-  Dimensions,
 } from "react-native";
 import axios from "axios";
 import * as Location from "expo-location";
@@ -25,57 +25,163 @@ if (Platform.OS === "android") {
 export default function WeatherForecastScreen() {
   const [weather, setWeather] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState(null);
   const [forecastType, setForecastType] = useState("Hourly");
   const [showTips, setShowTips] = useState(false);
   const navigation = useNavigation();
 
-  useEffect(() => {
-    const fetchWeather = async () => {
-      try {
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== "granted") {
-          console.error("Location permission denied");
-          setLoading(false);
-          return;
-        }
-
-        const location = await Location.getCurrentPositionAsync({});
-        const { latitude, longitude } = location.coords;
-
-        const res = await axios.get(
-          `https://2b55f8fb-4fda-40b3-9a62-9282bf78e6c0-dev.e1-us-east-azure.choreoapis.dev/aquawatch/weather-service/v1.0/api/weather/forecast?lat=${latitude}&lon=${longitude}`
-        );
-        if (res.data.success) setWeather(res.data.data);
-      } catch (err) {
-        console.error("Error fetching weather data:", err);
-      } finally {
+  const fetchWeather = async () => {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        console.error("Location permission denied");
         setLoading(false);
+        return;
       }
-    };
 
+      const location = await Location.getCurrentPositionAsync({});
+      const { latitude, longitude } = location.coords;
+
+      const res = await axios.get(
+        `https://2b55f8fb-4fda-40b3-9a62-9282bf78e6c0-dev.e1-us-east-azure.choreoapis.dev/aquawatch/weather-service/v1.0/api/weather/forecast?lat=${latitude}&lon=${longitude}`
+      );
+      if (res.data.success) {
+        setWeather(res.data.data);
+        setLastUpdated(new Date());
+      }
+    } catch (err) {
+      console.error("Error fetching weather data:", err);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
     fetchWeather();
   }, []);
 
+  const onRefresh = React.useCallback(() => {
+    setRefreshing(true);
+    fetchWeather();
+  }, []);
+
+  const SkeletonCard = ({ style }) => (
+    <Animatable.View
+      animation="pulse"
+      iterationCount="infinite"
+      style={[
+        {
+          backgroundColor: "#E5E7EB",
+          borderRadius: 20,
+          height: 180,
+          width: "100%",
+        },
+        style,
+      ]}
+    />
+  );
+
+  const SkeletonRow = () => (
+    <View style={{ flexDirection: "row", marginVertical: 8 }}>
+      <Animatable.View
+        animation="pulse"
+        iterationCount="infinite"
+        style={{
+          backgroundColor: "#E5E7EB",
+          borderRadius: 12,
+          height: 20,
+          width: 20,
+          marginRight: 8,
+        }}
+      />
+      <Animatable.View
+        animation="pulse"
+        iterationCount="infinite"
+        style={{
+          backgroundColor: "#E5E7EB",
+          borderRadius: 4,
+          height: 20,
+          width: "60%",
+        }}
+      />
+    </View>
+  );
+
   if (loading)
     return (
-      <View className="flex-1 justify-center items-center bg-white">
-        <Animatable.View animation="pulse" iterationCount="infinite">
-          <MaterialCommunityIcons
-            name="weather-sunny"
-            size={70}
-            color="#3C467B"
-            style={{ marginBottom: 10 }}
-          />
-        </Animatable.View>
-        <Animatable.Text
-          animation="fadeIn"
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: "#fff",
+          padding: 16,
+          paddingTop: 48,
+        }}
+      >
+        {/* Location Skeleton */}
+        <Animatable.View
+          animation="pulse"
           iterationCount="infinite"
-          duration={2000}
-          className="text-blue text-lg font-semibold mb-3"
+          style={{
+            backgroundColor: "#E5E7EB",
+            height: 24,
+            width: "70%",
+            borderRadius: 4,
+            alignSelf: "center",
+            marginBottom: 24,
+          }}
+        />
+
+        {/* Current Conditions Card Skeleton */}
+        <View
+          style={{
+            backgroundColor: "#F3F4F6",
+            borderRadius: 20,
+            padding: 16,
+            marginBottom: 24,
+          }}
         >
-          Fetching weather data...
-        </Animatable.Text>
-        <ActivityIndicator size="large" color="#636CCB" />
+          <View
+            style={{
+              flexDirection: "row",
+              justifyContent: "center",
+              marginBottom: 16,
+            }}
+          >
+            <Animatable.View
+              animation="pulse"
+              iterationCount="infinite"
+              style={{
+                backgroundColor: "#E5E7EB",
+                height: 24,
+                width: "40%",
+                borderRadius: 4,
+              }}
+            />
+          </View>
+          <SkeletonRow />
+          <SkeletonRow />
+          <SkeletonRow />
+          <SkeletonRow />
+        </View>
+
+        {/* Forecast Cards Skeleton */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={{ marginTop: 16 }}
+        >
+          {[1, 2, 3].map((_, idx) => (
+            <SkeletonCard
+              key={idx}
+              style={{
+                width: 170,
+                marginRight: 12,
+              }}
+            />
+          ))}
+        </ScrollView>
       </View>
     );
 
@@ -87,11 +193,60 @@ export default function WeatherForecastScreen() {
           justifyContent: "center",
           alignItems: "center",
           backgroundColor: "#fff",
+          padding: 20,
         }}
       >
-        <Text style={{ color: "#3C467B", fontSize: 18 }}>
-          Unable to load weather data.
-        </Text>
+        <Animatable.View animation="fadeIn" duration={800}>
+          <MaterialCommunityIcons
+            name="weather-cloudy-alert"
+            size={70}
+            color="#3C467B"
+            style={{ marginBottom: 16, alignSelf: "center" }}
+          />
+          <Text
+            style={{
+              color: "#3C467B",
+              fontSize: 18,
+              textAlign: "center",
+              marginBottom: 12,
+              fontWeight: "600",
+            }}
+          >
+            Unable to load weather data
+          </Text>
+          <Text
+            style={{
+              color: "#6B7280",
+              fontSize: 14,
+              textAlign: "center",
+              marginBottom: 24,
+            }}
+          >
+            Please check your internet connection and location permissions
+          </Text>
+          <TouchableOpacity
+            onPress={fetchWeather}
+            style={{
+              backgroundColor: "#3C467B",
+              paddingVertical: 12,
+              paddingHorizontal: 24,
+              borderRadius: 20,
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <MaterialCommunityIcons
+              name="refresh"
+              size={20}
+              color="#fff"
+              style={{ marginRight: 8 }}
+            />
+            <Text style={{ color: "#fff", fontSize: 16, fontWeight: "600" }}>
+              Try Again
+            </Text>
+          </TouchableOpacity>
+        </Animatable.View>
       </View>
     );
 
@@ -146,6 +301,42 @@ export default function WeatherForecastScreen() {
     </View>
   );
 
+  const getTimeString = (idx) => {
+    const now = new Date();
+    const futureTime = new Date(now.getTime() + idx * 60 * 60 * 1000);
+    return futureTime.toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  const WaveHeightIndicator = ({ height }) => {
+    const percentage = Math.min((height / 3) * 100, 100); // 3m as max height
+    const color = getWaveColor(height);
+    return (
+      <View
+        style={{
+          height: 60,
+          width: 8,
+          backgroundColor: "#E5E7EB",
+          borderRadius: 4,
+          marginRight: 12,
+        }}
+      >
+        <View
+          style={{
+            position: "absolute",
+            bottom: 0,
+            width: "100%",
+            height: `${percentage}%`,
+            backgroundColor: color,
+            borderRadius: 4,
+          }}
+        />
+      </View>
+    );
+  };
+
   const renderHourly = () => {
     if (!marine?.hourly?.wave_height) return <Text>No hourly data</Text>;
     const hoursToShow = marine.hourly.wave_height.slice(0, 7);
@@ -156,49 +347,74 @@ export default function WeatherForecastScreen() {
         contentContainerStyle={{ paddingHorizontal: 8 }}
       >
         {hoursToShow.map((wave, idx) => (
-          <LinearGradient
-            key={idx}
-            colors={["#636CCB", "#6E8CFB"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={{
-              width: 170,
-              margin: 6,
-              padding: 14,
-              borderRadius: 20,
-              elevation: 4,
-            }}
-          >
-            <Text
+          <Animatable.View key={idx} animation="fadeIn" delay={idx * 100}>
+            <LinearGradient
+              colors={["#636CCB", "#6E8CFB"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
               style={{
-                color: "#fff",
-                fontSize: 16,
-                fontWeight: "700",
-                marginBottom: 6,
+                width: 170,
+                margin: 6,
+                padding: 14,
+                borderRadius: 20,
+                elevation: 4,
               }}
             >
-              Hour {idx + 1}
-            </Text>
-            <Row
-              icon="waves"
-              label="Waves :"
-              value={`${wave ?? "--"} m`}
-              colorClass={getWaveColor(wave)}
-            />
-            <Row
-              icon="navigation-variant"
-              label="Current :"
-              value={`${marine.hourly.ocean_current_velocity[idx] ?? "--"} m/s`}
-            />
-            <Row
-              icon="compass"
-              label="Direction :"
-              value={`${marine.hourly.wave_direction[idx] ?? "--"}°`}
-            />
-          </LinearGradient>
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  marginBottom: 12,
+                }}
+              >
+                <WaveHeightIndicator height={wave} />
+                <View>
+                  <Text
+                    style={{ color: "#fff", fontSize: 16, fontWeight: "700" }}
+                  >
+                    {getTimeString(idx)}
+                  </Text>
+                  <Text style={{ color: "#E5E7EB", fontSize: 12 }}>
+                    {idx === 0 ? "Now" : `+${idx}h`}
+                  </Text>
+                </View>
+              </View>
+              <Row
+                icon="waves"
+                label="Waves"
+                value={`${wave ?? "--"} m`}
+                colorClass={getWaveColor(wave)}
+              />
+              <Row
+                icon="navigation-variant"
+                label="Current"
+                value={`${marine.hourly.ocean_current_velocity[idx] ?? "--"} m/s`}
+              />
+              <Row
+                icon="compass"
+                label="Direction"
+                value={`${marine.hourly.wave_direction[idx] ?? "--"}°`}
+              />
+            </LinearGradient>
+          </Animatable.View>
         ))}
       </ScrollView>
     );
+  };
+
+  const getDayString = (idx) => {
+    const days = [
+      "Sunday",
+      "Monday",
+      "Tuesday",
+      "Wednesday",
+      "Thursday",
+      "Friday",
+      "Saturday",
+    ];
+    const today = new Date();
+    const futureDate = new Date(today.getTime() + idx * 24 * 60 * 60 * 1000);
+    return idx === 0 ? "Today" : days[futureDate.getDay()];
   };
 
   const renderDaily = () => {
@@ -210,46 +426,56 @@ export default function WeatherForecastScreen() {
         contentContainerStyle={{ paddingHorizontal: 8 }}
       >
         {marine.daily.wave_height_max.map((waveMax, idx) => (
-          <LinearGradient
-            key={idx}
-            colors={["#636CCB", "#6E8CFB"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={{
-              width: 187,
-              margin: 6,
-              padding: 14,
-              borderRadius: 20,
-              elevation: 4,
-            }}
-          >
-            <Text
+          <Animatable.View key={idx} animation="fadeIn" delay={idx * 100}>
+            <LinearGradient
+              colors={["#636CCB", "#6E8CFB"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
               style={{
-                color: "#fff",
-                fontSize: 16,
-                fontWeight: "700",
-                marginBottom: 6,
+                width: 187,
+                margin: 6,
+                padding: 14,
+                borderRadius: 20,
+                elevation: 4,
               }}
             >
-              Day {idx + 1}
-            </Text>
-            <Row
-              icon="waves"
-              label="Waves:"
-              value={`${waveMax} m`}
-              colorClass={getWaveColor(waveMax)}
-            />
-            <Row
-              icon="compass"
-              label="Direction:"
-              value={`${marine.daily.wind_wave_direction_dominant[idx] ?? "--"}°`}
-            />
-            <Row
-              icon="weather-windy"
-              label="Wind Wave:"
-              value={`${marine.daily.wind_wave_height_max[idx] ?? "--"} m`}
-            />
-          </LinearGradient>
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  marginBottom: 12,
+                }}
+              >
+                <WaveHeightIndicator height={waveMax} />
+                <View>
+                  <Text
+                    style={{ color: "#fff", fontSize: 16, fontWeight: "700" }}
+                  >
+                    {getDayString(idx)}
+                  </Text>
+                  <Text style={{ color: "#E5E7EB", fontSize: 12 }}>
+                    {idx === 0 ? "Today" : `Day ${idx + 1}`}
+                  </Text>
+                </View>
+              </View>
+              <Row
+                icon="waves"
+                label="Waves"
+                value={`${waveMax} m`}
+                colorClass={getWaveColor(waveMax)}
+              />
+              <Row
+                icon="compass"
+                label="Direction"
+                value={`${marine.daily.wind_wave_direction_dominant[idx] ?? "--"}°`}
+              />
+              <Row
+                icon="weather-windy"
+                label="Wind Wave"
+                value={`${marine.daily.wind_wave_height_max[idx] ?? "--"} m`}
+              />
+            </LinearGradient>
+          </Animatable.View>
         ))}
       </ScrollView>
     );
@@ -361,18 +587,29 @@ export default function WeatherForecastScreen() {
         paddingTop: 48,
       }}
     >
-      <ScrollView showsVerticalScrollIndicator={false}>
-        <Text
-          style={{
-            fontSize: 20,
-            fontWeight: "800",
-            color: "#3C467B",
-            textAlign: "center",
-            marginBottom: 12,
-          }}
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
+        <Animatable.View
+          animation="fadeIn"
+          duration={800}
+          style={{ width: "100%" }}
         >
-          Forecast for {locationName}, Sri Lanka
-        </Text>
+          <Text
+            style={{
+              fontSize: 20,
+              fontWeight: "800",
+              color: "#3C467B",
+              textAlign: "center",
+              marginBottom: 12,
+            }}
+          >
+            Forecast for {locationName}, Sri Lanka
+          </Text>
+        </Animatable.View>
 
         {(currentWeather?.windSpeed > 30 ||
           marine?.current?.wave_height > 2.5) && (
@@ -398,7 +635,9 @@ export default function WeatherForecastScreen() {
         )}
 
         {/* Current Conditions */}
-        <View
+        <Animatable.View
+          animation="fadeIn"
+          duration={800}
           style={{
             backgroundColor: "#E0E7FF",
             borderRadius: 20,
@@ -409,17 +648,49 @@ export default function WeatherForecastScreen() {
             elevation: 4,
           }}
         >
-          <Text
+          <View
             style={{
-              fontSize: 18,
-              fontWeight: "800",
-              color: "#3C467B",
-              textAlign: "center",
-              marginBottom: 6,
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "center",
+              marginBottom: 12,
             }}
           >
-            Current Conditions
-          </Text>
+            <MaterialCommunityIcons
+              name={
+                currentWeather?.conditions?.toLowerCase().includes("rain")
+                  ? "weather-pouring"
+                  : currentWeather?.conditions?.toLowerCase().includes("cloud")
+                    ? "weather-cloudy"
+                    : "weather-sunny"
+              }
+              size={32}
+              color="#3C467B"
+              style={{ marginRight: 8 }}
+            />
+            <Text
+              style={{
+                fontSize: 18,
+                fontWeight: "800",
+                color: "#3C467B",
+                textAlign: "center",
+              }}
+            >
+              Current Conditions
+            </Text>
+          </View>
+          {lastUpdated && (
+            <Text
+              style={{
+                textAlign: "center",
+                color: "#6B7280",
+                fontSize: 12,
+                marginBottom: 8,
+              }}
+            >
+              Last updated: {lastUpdated.toLocaleTimeString()}
+            </Text>
+          )}
           <View
             style={{
               height: 1,
@@ -460,7 +731,7 @@ export default function WeatherForecastScreen() {
             labelColor="#3C467B"
             iconColor="#60A5FA"
           />
-        </View>
+        </Animatable.View>
 
         {/* Forecast Type Tabs */}
         <View
