@@ -11,7 +11,7 @@ app.use(express.json());
 
 // debug: log every request path that actually reaches Express
 app.use((req, _res, next) => {
-  console.log(`[gps] ${req.method} ${req.originalUrl}`);
+  console.log(`[police] ${req.method} ${req.originalUrl}`);
   next();
 });
 

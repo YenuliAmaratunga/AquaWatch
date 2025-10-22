@@ -11,7 +11,8 @@ import {
 } from "react-native";
 import MapView, { Marker } from "react-native-maps";
 import * as Location from "expo-location";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+//import AsyncStorage from "@react-native-async-storage/async-storage";
+import { ensureProfile } from "../api/auth";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 import {
@@ -29,9 +30,10 @@ export default function GPSTrackingScreen({ navigation }) {
   const [myPos, setMyPos] = useState(null); // { latitude, longitude }
   //const [sosActive, setSosActive] = useState(false);
   const [sending, setSending] = useState(false);
+  const [idKey, setIdKey] = useState(null);
 
   // read auth once to get boatId (nationalId)
-  useEffect(() => {
+ /* useEffect(() => {
     (async () => {
       try {
         const raw = await AsyncStorage.getItem("auth");
@@ -44,7 +46,16 @@ export default function GPSTrackingScreen({ navigation }) {
         console.log("[gps] failed to load auth:", e?.message);
       }
     })();
-  }, []);
+  }, []); */
+  useEffect(() => {
+   (async () => {
+     const auth = await ensureProfile();
+     const id = auth.userId || "UNKNOWN";
+     setIdKey(id);
+     setBoatId(id);
+     console.log("[gps] idKey:", id);
+   })();
+ }, []);
 
   // SOS pulse animation
   useEffect(() => {
@@ -71,6 +82,7 @@ export default function GPSTrackingScreen({ navigation }) {
   // get location once; send initial update if we already know boatId
   useEffect(() => {
     (async () => {
+      if (!boatId) return;
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== "granted") {
         Alert.alert("Permission required", "Please enable location services.");
@@ -83,14 +95,20 @@ export default function GPSTrackingScreen({ navigation }) {
       };
       setMyPos(coord);
 
-      if (boatId) {
+      /*if (boatId) {
         try {
           console.log("[gps] initial update →", coord);
           await updateBoatLocation(boatId, coord.latitude, coord.longitude);
         } catch (e) {
           console.log("[gps] initial update failed:", e?.message);
         }
-      }
+      } */
+      try {
+     console.log("[gps] initial update →", { boatId, ...coord });
+     await updateBoatLocation(boatId, coord.latitude, coord.longitude);
+   } catch (e) {
+     console.log("[gps] initial update failed:", e?.message);
+   }
     })();
   }, [boatId]);
 

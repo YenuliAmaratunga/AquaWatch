@@ -11,20 +11,30 @@ import {
 import { useNavigation } from "@react-navigation/native";
 import dayjs from "dayjs";
 import axios from "axios";
+import { ensureProfile } from "../api/auth";
+
 
 import { getMyReports } from "../api/client";
 
-const reporterIdFallback = "BOAT_TEMP_001";
+//const reporterIdFallback = "BOAT_TEMP_001";
 
 export default function MyReports() {
   const nav = useNavigation();
   const [items, setItems] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [reporterId, setReporterId] = useState(null);
+   useEffect(() => {
+   (async () => {
+     const a = await ensureProfile();
+     setReporterId(a.userId || null);   
+   })();
+ }, []);
 
   const fetchReports = useCallback(async () => {
+    if (!reporterId) return;
     try {
       setRefreshing(true);
-      const reporterId = reporterIdFallback;
+      //const reporterId = reporterIdFallback;
       const data = await getMyReports(reporterId);
       setItems(Array.isArray(data) ? data : data?.data || []);
     } catch (e) {
@@ -32,7 +42,7 @@ export default function MyReports() {
     } finally {
       setRefreshing(false);
     }
-  }, []);
+  }, [reporterId]);
 
   useEffect(() => {
     fetchReports();
