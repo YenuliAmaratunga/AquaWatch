@@ -118,7 +118,7 @@ export default function HomeScreen() {
             marginTop: 20,
           }}
         >
-          <Ionicons name="brain" size={24} color="#fff" />
+
           <Text
             style={{
               color: "#fff",
@@ -127,7 +127,7 @@ export default function HomeScreen() {
               marginLeft: 10,
             }}
           >
-            🤖 AI Safety Features
+            AI Safety Features
           </Text>
         </TouchableOpacity>
       </View>
