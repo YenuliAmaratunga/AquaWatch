@@ -11,7 +11,7 @@ import {
   Platform,
   Modal,
   Vibration,
-  ScrollView,
+  ActivityIndicator,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
@@ -538,14 +538,32 @@ export default function GPSTrackingScreen({ navigation }) {
               colors={["#EF4444", "#DC2626"]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={{ paddingVertical: 16, alignItems: "center" }}
+              style={{
+                paddingVertical: 16,
+                alignItems: "center",
+                opacity: sending ? 0.8 : 1,
+              }}
             >
-              <Text className="text-white text-[18px] font-extrabold">
-                🚨 SOS – EMERGENCY
-              </Text>
-              <Text className="text-white/90 text-[12px] mt-1">
-                Sends your live location to Marine Police
-              </Text>
+              {sending ? (
+                <>
+                  <ActivityIndicator size="small" color="#fff" />
+                  <Text className="text-white text-[14px] font-extrabold mt-2">
+                    Sending SOS…
+                  </Text>
+                  <Text className="text-white/90 text-[12px] mt-1">
+                    Sharing your live location
+                  </Text>
+                </>
+              ) : (
+                <>
+                  <Text className="text-white text-[18px] font-extrabold">
+                    🚨 SOS – EMERGENCY
+                  </Text>
+                  <Text className="text-white/90 text-[12px] mt-1">
+                    Sends your live location to Marine Police
+                  </Text>
+                </>
+              )}
             </LinearGradient>
           </TouchableOpacity>
         </Animated.View>
@@ -607,7 +625,46 @@ export default function GPSTrackingScreen({ navigation }) {
 
         <View className="h-6" />
       </View>
-      </ScrollView>
+
+      <Modal transparent visible={sending} animationType="fade">
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0,0,0,0.35)",
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: "#fff",
+              borderRadius: 16,
+              paddingVertical: 16,
+              paddingHorizontal: 18,
+              width: Math.min(width - 64, 360),
+              alignItems: "center",
+            }}
+          >
+            <ActivityIndicator size="large" color="#DC2626" />
+            <Text
+              style={{ marginTop: 10, fontWeight: "800", color: "#1F2937" }}
+            >
+              Sending SOS…
+            </Text>
+            <Text
+              style={{
+                marginTop: 4,
+                fontSize: 12,
+                color: "#6B7280",
+                textAlign: "center",
+              }}
+            >
+              Contacting Marine Police and sharing your location.
+            </Text>
+          </View>
+        </View>
+      </Modal>
+
       {/* SOS Confirmation & Arming Modal */}
       <Modal
         transparent
@@ -622,17 +679,18 @@ export default function GPSTrackingScreen({ navigation }) {
           style={{
             flex: 1,
             backgroundColor: "rgba(0,0,0,0.5)",
-            justifyContent: "flex-end",
+            justifyContent: "center",
+            alignItems: "center",
           }}
         >
           <View
             style={{
               backgroundColor: "#fff",
-              borderTopLeftRadius: 24,
-              borderTopRightRadius: 24,
+              borderRadius: 24,
               paddingHorizontal: 16,
               paddingTop: 14,
               paddingBottom: 20,
+              width: Math.min(width - 32, 480),
             }}
           >
             {/* Handle bar */}
