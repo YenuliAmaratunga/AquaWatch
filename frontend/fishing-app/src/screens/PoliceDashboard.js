@@ -1111,7 +1111,7 @@ export default function PoliceDashboard() {
                           )}
                         </View>
                       </View>
-                    )) 
+                    ))
                   )}
                 </View>
               </View>
@@ -1168,9 +1168,81 @@ export default function PoliceDashboard() {
                   </View>
                 </View>
 
-                {/* primary action */}
+                {/* 🆕 Only show triage actions if we have a real alertId */}
+                {focusedBoat?.alertId ? (
+                  <>
+                    <View className="flex-row flex-wrap gap-2 mt-1 mb-2">
+                      <TouchableOpacity
+                        className="px-3 py-2 rounded-full bg-red-50 border border-red-200"
+                        onPress={() =>
+                          setSosUiStatus((s) => ({
+                            ...s,
+                            [focusedBoat.boatId]: "active",
+                            ...(focusedBoat.alertId
+                              ? { [focusedBoat.alertId]: "active" }
+                              : {}),
+                          }))
+                        }
+                        activeOpacity={0.9}
+                      >
+                        <Text className="text-red-700 font-semibold text-sm">
+                          Mark Active
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        className="px-3 py-2 rounded-full bg-orange-50 border border-orange-200"
+                        onPress={() =>
+                          setSosUiStatus((s) => ({
+                            ...s,
+                            [focusedBoat.boatId]: "help-sent",
+                          }))
+                        }
+                        activeOpacity={0.9}
+                      >
+                        <Text className="text-orange-700 font-semibold text-sm">
+                          Help sent
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        className="px-3 py-2 rounded-full bg-green-50 border border-green-200"
+                        onPress={() =>
+                          setSosUiStatus((s) => ({
+                            ...s,
+                            [focusedBoat.boatId]: "resolved",
+                          }))
+                        }
+                        activeOpacity={0.9}
+                      >
+                        <Text className="text-green-700 font-semibold text-sm">
+                          Resolved
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+
+                    {!!sosUiStatus[focusedBoat.boatId] && (
+                      <View className="items-center mt-1 mb-1">
+                        <Text className="text-secondaryText text-xs mb-1">
+                          Current status
+                        </Text>
+                        <View className="bg-darkBlue/90 px-3 py-1 rounded-full">
+                          <Text className="text-white font-sans font-semibold text-xs">
+                            {sosUiStatus[focusedBoat.boatId].replace("-", " ")}
+                          </Text>
+                        </View>
+                      </View>
+                    )}
+                  </>
+                ) : (
+                  <Text className="text-accentText mt-2 mb-1 text-center">
+                    No active SOS alert found for this boat.
+                  </Text>
+                )}
+
+                {/* Link-style “More info” row (not a big filled button) */}
                 <TouchableOpacity
-                  className="bg-blueLight rounded-2xl px-4 py-3 mb-3"
+                  className="mt-3 bg-white border border-lightPurple rounded-xl px-4 py-3"
                   onPress={() => {
                     const u = getUserInfo(focusedBoat.boatId);
                     const lines = u
@@ -1184,83 +1256,19 @@ export default function PoliceDashboard() {
                       : [`ID: ${labelFor(focusedBoat.boatId)}`];
                     Alert.alert("Fisherman details", lines.join("\n"));
                   }}
+                  activeOpacity={0.9}
                 >
-                  <Text className="text-white font-sans font-semibold text-center">
+                  <Text className="text-blue font-sans font-semibold text-center">
                     More info
                   </Text>
                 </TouchableOpacity>
 
-                {/* 🆕 Only show triage actions if we have a real alertId */}
-                {focusedBoat?.alertId ? (
-                  <>
-                    <View className="flex-row justify-between mt-1">
-                      {/* remove this first button if you don't want Acknowledge in v1 */}
-                      <TouchableOpacity
-                        className="bg-red-600 rounded-xl px-3 py-3 flex-1 mr-2"
-                        onPress={() =>
-                          setSosUiStatus((s) => ({
-                            ...s,
-                            [focusedBoat.boatId]: "active",
-                            ...(focusedBoat.alertId
-                              ? { [focusedBoat.alertId]: "active" }
-                              : {}),
-                          }))
-                        }
-                      >
-                        <Text className="text-white font-semibold">
-                          Mark Active
-                        </Text>
-                      </TouchableOpacity>
+                {/* Spacer so buttons don’t touch */}
+                <View className="mt-5" />
 
-                      <TouchableOpacity
-                        className="bg-orange-500 rounded-xl px-3 py-3 flex-1 mx-2"
-                        onPress={() =>
-                          setSosUiStatus((s) => ({
-                            ...s,
-                            [focusedBoat.boatId]: "help-sent",
-                          }))
-                        }
-                      >
-                        <Text className="text-white font-semibold">
-                          Help sent
-                        </Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        className="bg-green-600 rounded-xl px-3 py-3 flex-1 ml-2"
-                        onPress={() =>
-                          setSosUiStatus((s) => ({
-                            ...s,
-                            [focusedBoat.boatId]: "resolved",
-                          }))
-                        }
-                      >
-                        <Text className="text-white font-semibold">
-                          Resolved
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-
-                    {!!sosUiStatus[focusedBoat.boatId] && (
-                      <View className="items-center mt-3">
-                        <Text className="text-secondaryText text-xs mb-1">
-                          Current status
-                        </Text>
-                        <View className="bg-darkBlue/90 px-3 py-1 rounded-full">
-                          <Text className="text-white font-sans font-semibold text-xs">
-                            {sosUiStatus[focusedBoat.boatId].replace("-", " ")}
-                          </Text>
-                        </View>
-                      </View>
-                    )}
-                  </>
-                ) : (
-                  <Text className="text-accentText mt-3 text-center">
-                    No active SOS alert found for this boat.
-                  </Text>
-                )}
+                {/* Primary close button (slimmer) */}
                 <TouchableOpacity
-                  className="bg-blue rounded-2xl py-4 items-center shadow-xl"
+                  className="bg-blue rounded-2xl py-3 items-center shadow-xl"
                   onPress={() => setFocusedBoat(null)}
                   style={{
                     shadowColor: "#636CCB",
@@ -1268,6 +1276,7 @@ export default function PoliceDashboard() {
                     shadowOpacity: 0.3,
                     shadowRadius: 12,
                   }}
+                  activeOpacity={0.92}
                 >
                   <Text className="text-white font-heading font-bold text-lg">
                     Close Details
