@@ -8,6 +8,7 @@ import {
   Dimensions,
   Animated,
   Easing,
+  ScrollView,
 } from "react-native";
 import MapView, { Marker, Polygon } from "react-native-maps";
 import * as Location from "expo-location";
@@ -66,18 +67,25 @@ export default function ReportHubScreen({ navigation }) {
   // Get device location once
   useEffect(() => {
     (async () => {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== "granted") {
-        Alert.alert("Permission required", "Please enable location services.");
-        return;
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== "granted") {
+          Alert.alert("Permission required", "Please enable location services in settings.");
+          return;
+        }
+        const pos = await Location.getCurrentPositionAsync({});
+        const coord = {
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+        };
+        setMyPos(coord);
+        setOutOfZone(!isPointInPolygon(coord, EXAMPLE_ALLOWED_ZONE));
+      } catch (error) {
+        console.error("Location error:", error);
+        // Use default location if error
+        const defaultCoord = { latitude: 6.9271, longitude: 79.8612 };
+        setMyPos(defaultCoord);
       }
-      const pos = await Location.getCurrentPositionAsync({});
-      const coord = {
-        latitude: pos.coords.latitude,
-        longitude: pos.coords.longitude,
-      };
-      setMyPos(coord);
-      setOutOfZone(!isPointInPolygon(coord, EXAMPLE_ALLOWED_ZONE));
     })();
   }, []);
 
@@ -108,9 +116,13 @@ export default function ReportHubScreen({ navigation }) {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-white" style={{ paddingTop: 6 }}>
+    <SafeAreaView className="flex-1 bg-white">
+      <ScrollView 
+        contentContainerStyle={{ paddingBottom: 40 }} 
+        showsVerticalScrollIndicator={false}
+      >
       {/* Header */}
-      <View className="px-4 pb-2">
+      <View className="px-4 pb-2 pt-6">
         <View className="flex-row items-center justify-between">
           <View>
             <Text className="text-[18px] font-extrabold text-blue">Report Center</Text>
@@ -232,6 +244,7 @@ export default function ReportHubScreen({ navigation }) {
 
         <View className="h-6" />
       </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }

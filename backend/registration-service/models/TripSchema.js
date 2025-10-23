@@ -28,14 +28,25 @@ const TripSchema = new mongoose.Schema(
     endDate: { type: Date },
     endTime: { type: String }, 
 
+    currentLocation: {
+    latitude: { type: Number, default: null },
+    longitude: { type: Number, default: null },
+    updatedAt: { type: Date, default: null },
+  },
+
     shareToken: { type: String, allowNull: false, unique: true },
     qrData: { type: String, allowNull: false },
     qrGeneratedAt: { type: Date, defaultValue: Date.now },
+
+
     
   },
+  
   {
     timestamps: true, 
-  }
+  },
+
+  
 );
 
 module.exports = mongoose.model("Trip", TripSchema);

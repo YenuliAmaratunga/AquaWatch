@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, TouchableOpacity, ScrollView, Image, Platform } from "react-native";
+import { View, Text, TouchableOpacity, ScrollView, Image, Platform, Alert } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 
@@ -124,9 +124,21 @@ export default function FishermanLandingScreen() {
               style={cardStyle}
               activeOpacity={0.8}
               onPress={() => {
-                if (key === "boat") navigation.navigate("Boat");
-                if (key === "trip") navigation.navigate("Trips");
-                if (key === "gear") navigation.navigate("Compass");
+                if (key === "boat") {
+                  navigation.navigate("Boat");
+                } else if (key === "trip") {
+                  navigation.navigate("Trips");
+                } else if (key === "safe") {
+                  // Coming soon
+                  navigation.navigate("AIFeaturesMenu");
+                } else {
+                  // Show coming soon for features not implemented yet
+                  Alert.alert(
+                    "Coming Soon! 🚀",
+                    `The ${translations[language][key]} feature will be available soon. Stay tuned!`,
+                    [{ text: "OK", style: "default" }]
+                  );
+                }
               }}
             >
               <View className="items-center">
