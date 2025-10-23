@@ -366,18 +366,54 @@ export default function GPSTrackingScreen({ navigation }) {
   return (
     <SafeAreaView className="flex-1 bg-white" style={{ paddingTop: 6 }}>
       {/* Header */}
-      <View className="px-4 pb-2 items-center">
-        <Text className="text-[20px] font-extrabold text-blue text-center">
+      <View
+        style={{
+          paddingHorizontal: 16,
+          paddingBottom: 8,
+          alignItems: "center",
+          marginTop: 4,
+        }}
+      >
+        <Text
+          style={{
+            fontSize: 22,
+            fontWeight: "900",
+            color: "#3C467B",
+            letterSpacing: 0.3,
+          }}
+        >
           Report Center
         </Text>
-        <Text className="text-[12px] text-[#6E8CFB99] text-center mt-0.5">
+
+        <Text
+          style={{
+            fontSize: 12,
+            color: "#6E8CFB",
+            marginTop: 4,
+            fontWeight: "600",
+          }}
+        >
           SOS • New Report • My Reports
         </Text>
 
-        <View className="bg-lightPurple/80 rounded-full px-3 py-1 mt-2">
-          <Text className="text-blue text-[11px] font-semibold">Live</Text>
+        {/* Live chip (no heavy bg) */}
+        <View
+          style={{
+            marginTop: 8,
+            borderRadius: 999,
+            paddingHorizontal: 10,
+            paddingVertical: 6,
+            backgroundColor: "#fff",
+            borderWidth: 1,
+            borderColor: "#D6DBF7",
+          }}
+        >
+          <Text style={{ color: "#636CCB", fontSize: 11, fontWeight: "700" }}>
+            Live
+          </Text>
         </View>
       </View>
+
       {/* Notice banner (success / error) */}
       {notice && (
         <Animated.View
@@ -571,51 +607,85 @@ export default function GPSTrackingScreen({ navigation }) {
           <TouchableOpacity
             onPress={() => navigation.navigate("ReportTypePicker")}
             accessibilityLabel="Create new report"
-            className="flex-1 mr-3 bg-white rounded-2xl py-4 items-center"
+            className="flex-1 mr-3 rounded-2xl items-center"
             style={{
-              borderWidth: 1,
-              borderColor: "#50589C33",
+              overflow: "hidden",
+              borderWidth: 0,
+              elevation: 4,
               shadowColor: "#000",
-              shadowOpacity: 0.08,
-              shadowRadius: 6,
-              elevation: 3,
+              shadowOpacity: 0.1,
+              shadowRadius: 8,
             }}
             activeOpacity={0.9}
           >
-            <MaterialCommunityIcons
-              name="note-plus"
-              size={20}
-              color="#50589C"
-            />
-            <Text className="text-blue font-bold mt-1">New Report</Text>
-            <Text className="text-[#6E8CFB99] text-[11px] mt-0.5">
-              Hazard or Violation
-            </Text>
+            <LinearGradient
+              colors={["#636CCB", "#8B93FF"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={{
+                width: "100%",
+                paddingVertical: 16,
+                alignItems: "center",
+              }}
+            >
+              <MaterialCommunityIcons name="note-plus" size={20} color="#fff" />
+              <Text style={{ color: "#fff", fontWeight: "800", marginTop: 4 }}>
+                New Report
+              </Text>
+              <Text
+                style={{
+                  color: "rgba(255,255,255,0.9)",
+                  fontSize: 11,
+                  marginTop: 2,
+                }}
+              >
+                Hazard or Violation
+              </Text>
+            </LinearGradient>
           </TouchableOpacity>
 
           <TouchableOpacity
             onPress={() => navigation.navigate("MyReports")}
             accessibilityLabel="View my reports"
-            className="flex-1 ml-3 bg-white rounded-2xl py-4 items-center"
+            className="flex-1 ml-3 rounded-2xl items-center"
             style={{
-              borderWidth: 1,
-              borderColor: "#50589C33",
+              overflow: "hidden",
+              borderWidth: 0,
+              elevation: 4,
               shadowColor: "#000",
-              shadowOpacity: 0.08,
-              shadowRadius: 6,
-              elevation: 3,
+              shadowOpacity: 0.1,
+              shadowRadius: 8,
             }}
             activeOpacity={0.9}
           >
-            <MaterialCommunityIcons
-              name="folder-account"
-              size={20}
-              color="#50589C"
-            />
-            <Text className="text-blue font-bold mt-1">My Reports</Text>
-            <Text className="text-[#6E8CFB99] text-[11px] mt-0.5">
-              View & edit
-            </Text>
+            <LinearGradient
+              colors={["#50589C", "#6E8CFB"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={{
+                width: "100%",
+                paddingVertical: 16,
+                alignItems: "center",
+              }}
+            >
+              <MaterialCommunityIcons
+                name="folder-account"
+                size={20}
+                color="#fff"
+              />
+              <Text style={{ color: "#fff", fontWeight: "800", marginTop: 4 }}>
+                My Reports
+              </Text>
+              <Text
+                style={{
+                  color: "rgba(255,255,255,0.9)",
+                  fontSize: 11,
+                  marginTop: 2,
+                }}
+              >
+                View & edit
+              </Text>
+            </LinearGradient>
           </TouchableOpacity>
         </View>
 
