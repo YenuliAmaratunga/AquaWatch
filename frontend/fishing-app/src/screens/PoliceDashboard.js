@@ -104,6 +104,35 @@ export default function PoliceDashboard() {
   // 🆕 top-of-page SOS filter
   const [sosFilter, setSosFilter] = useState("all");
 
+  // ▼ dropdown toggles
+  const [typeMenuOpen, setTypeMenuOpen] = useState(false);
+  const [statusMenuOpen, setStatusMenuOpen] = useState(false);
+
+  // ▼ dropdown options
+  const REPORT_TYPES = [
+    { value: "all", label: "All Reports" },
+    { value: "violation", label: "Violations" },
+    { value: "hazard", label: "Hazards" },
+  ];
+
+  const STATUS_OPTIONS = [
+    { value: "all", label: "All Status" },
+    { value: "pending", label: "Pending" },
+    { value: "verified", label: "Verified" },
+    { value: "resolved", label: "Resolved" },
+  ];
+
+  // ▼ short label for the reporter (prefers name; else compact NIC; else fallback)
+  const reporterShort = (id) => {
+    const u = getUserInfo(id);
+    if (u?.name) return u.name;
+    if (u?.nationalId) {
+      const nic = u.nationalId;
+      return nic.length > 10 ? `${nic.slice(0, 6)}…${nic.slice(-3)}` : nic;
+    }
+    return labelFor(id);
+  };
+
   // must build sosList first
   const sosList = useMemo(() => {
     const base = alerts
@@ -400,8 +429,7 @@ export default function PoliceDashboard() {
               </View>
               <View className="flex-1">
                 <Text className="text-white font-heading font-bold text-xl">
-                  Active SOS Alerts:{" "}
-                  {loadingAlerts ? "..." : sosList.length}
+                  Active SOS Alerts: {loadingAlerts ? "..." : sosList.length}
                 </Text>
                 <Text className="text-white/90 text-sm font-sans mt-1">
                   Emergency situations requiring immediate attention
@@ -693,72 +721,143 @@ export default function PoliceDashboard() {
       {tab === "reports" && (
         <View className="flex-1">
           {/* Enhanced Filters */}
+          {/* Filters (dropdown style, not tabs) */}
           <View className="px-6 pt-6 pb-4 bg-white border-b border-lightPurple">
-            <View className="mb-4">
-              <Text className="text-darkBlue font-heading font-bold text-lg mb-3">
-                📊 Report Type
-              </Text>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                className="flex-row"
+            <Text className="text-darkBlue font-heading font-bold text-lg mb-2">
+              Filters
+            </Text>
+
+            <View className="flex-row">
+              {/* Report Type selector */}
+              <TouchableOpacity
+                onPress={() => setTypeMenuOpen(true)}
+                className="flex-1 mr-3 bg-white border border-lightPurple rounded-xl px-3 py-3"
+                activeOpacity={0.9}
               >
-                <FilterChip
-                  value="all"
-                  current={reportType}
-                  onChange={setReportType}
-                  label="📋 All Reports"
-                />
-                <FilterChip
-                  value="violation"
-                  current={reportType}
-                  onChange={setReportType}
-                  label="⚖️ Violations"
-                />
-                <FilterChip
-                  value="hazard"
-                  current={reportType}
-                  onChange={setReportType}
-                  label="⚠️ Hazards"
-                />
-              </ScrollView>
-            </View>
-            <View>
-              <Text className="text-darkBlue font-heading font-bold text-lg mb-3">
-                🎯 Status Filter
-              </Text>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                className="flex-row"
+                <Text className="text-secondaryText text-xs mb-1">
+                  Report Type
+                </Text>
+                <Text className="text-blue font-semibold">
+                  {REPORT_TYPES.find((o) => o.value === reportType)?.label}
+                </Text>
+              </TouchableOpacity>
+
+              {/* Status selector */}
+              <TouchableOpacity
+                onPress={() => setStatusMenuOpen(true)}
+                className="flex-1 ml-3 bg-white border border-lightPurple rounded-xl px-3 py-3"
+                activeOpacity={0.9}
               >
-                <FilterChip
-                  value="all"
-                  current={statusFilter}
-                  onChange={setStatusFilter}
-                  label="All Status"
-                />
-                <FilterChip
-                  value="pending"
-                  current={statusFilter}
-                  onChange={setStatusFilter}
-                  label="⏳ Pending"
-                />
-                <FilterChip
-                  value="verified"
-                  current={statusFilter}
-                  onChange={setStatusFilter}
-                  label="✅ Verified"
-                />
-                <FilterChip
-                  value="resolved"
-                  current={statusFilter}
-                  onChange={setStatusFilter}
-                  label="✅ Resolved"
-                />
-              </ScrollView>
+                <Text className="text-secondaryText text-xs mb-1">Status</Text>
+                <Text className="text-blue font-semibold">
+                  {STATUS_OPTIONS.find((o) => o.value === statusFilter)?.label}
+                </Text>
+              </TouchableOpacity>
             </View>
           </View>
+
+          {/* Type dropdown */}
+          <Modal
+            transparent
+            visible={typeMenuOpen}
+            animationType="fade"
+            onRequestClose={() => setTypeMenuOpen(false)}
+          >
+            <TouchableOpacity
+              activeOpacity={1}
+              onPress={() => setTypeMenuOpen(false)}
+              style={{
+                flex: 1,
+                backgroundColor: "rgba(0,0,0,0.35)",
+                justifyContent: "center",
+                alignItems: "center",
+              }}
+            >
+              <View
+                style={{
+                  backgroundColor: "#fff",
+                  borderRadius: 16,
+                  paddingVertical: 8,
+                  width: 320,
+                  maxWidth: "85%",
+                  borderWidth: 1,
+                  borderColor: "#D6DBF7",
+                }}
+              >
+                {REPORT_TYPES.map((opt) => (
+                  <TouchableOpacity
+                    key={opt.value}
+                    onPress={() => {
+                      setReportType(opt.value);
+                      setTypeMenuOpen(false);
+                    }}
+                    style={{ paddingVertical: 12, paddingHorizontal: 16 }}
+                  >
+                    <Text
+                      style={{
+                        color: opt.value === reportType ? "#3C467B" : "#4B5563",
+                        fontWeight: opt.value === reportType ? "800" : "600",
+                      }}
+                    >
+                      {opt.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </TouchableOpacity>
+          </Modal>
+
+          {/* Status dropdown */}
+          <Modal
+            transparent
+            visible={statusMenuOpen}
+            animationType="fade"
+            onRequestClose={() => setStatusMenuOpen(false)}
+          >
+            <TouchableOpacity
+              activeOpacity={1}
+              onPress={() => setStatusMenuOpen(false)}
+              style={{
+                flex: 1,
+                backgroundColor: "rgba(0,0,0,0.35)",
+                justifyContent: "center",
+                alignItems: "center",
+              }}
+            >
+              <View
+                style={{
+                  backgroundColor: "#fff",
+                  borderRadius: 16,
+                  paddingVertical: 8,
+                  width: 320,
+                  maxWidth: "85%",
+                  borderWidth: 1,
+                  borderColor: "#D6DBF7",
+                }}
+              >
+                {STATUS_OPTIONS.map((opt) => (
+                  <TouchableOpacity
+                    key={opt.value}
+                    onPress={() => {
+                      setStatusFilter(opt.value);
+                      setStatusMenuOpen(false);
+                    }}
+                    style={{ paddingVertical: 12, paddingHorizontal: 16 }}
+                  >
+                    <Text
+                      style={{
+                        color:
+                          opt.value === statusFilter ? "#3C467B" : "#4B5563",
+                        fontWeight: opt.value === statusFilter ? "800" : "600",
+                      }}
+                    >
+                      {opt.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </TouchableOpacity>
+          </Modal>
 
           {loadingReports ? (
             <View className="flex-1 justify-center items-center">
@@ -860,9 +959,15 @@ export default function PoliceDashboard() {
                         )}
 
                         <View className="flex-row justify-between items-center pt-4 border-t border-lightPurple">
-                          <View className="flex-row items-center">
-                            <Text className="text-accentText text-sm font-sans">
-                              Reporter: {labelFor(r.reporterId || r.boatId)}
+                          <View className="flex-row items-center flex-1 pr-3">
+                            <Text
+                              className="text-accentText text-sm font-sans"
+                              numberOfLines={1}
+                              ellipsizeMode="tail"
+                              style={{ maxWidth: "60%" }}
+                            >
+                              Reporter:{" "}
+                              {reporterShort(r.reporterId || r.boatId)}
                             </Text>
                           </View>
 
@@ -970,18 +1075,22 @@ export default function PoliceDashboard() {
                         )}
 
                         <View className="flex-row justify-between items-center pt-4 border-t border-lightPurple">
-                          <View className="flex-row items-center">
-                            <View>
-                              <Text className="text-accentText text-sm font-sans">
-                                Severity:{" "}
-                                <Text className="font-semibold capitalize">
-                                  {r.severity || "medium"}
-                                </Text>
+                          <View>
+                            <Text className="text-accentText text-sm font-sans">
+                              Severity:{" "}
+                              <Text className="font-semibold capitalize">
+                                {r.severity || "medium"}
                               </Text>
-                              <Text className="text-accentText text-sm font-sans mt-1">
-                                Reporter: {labelFor(r.reporterId || r.boatId)}
-                              </Text>
-                            </View>
+                            </Text>
+                            <Text
+                              className="text-accentText text-sm font-sans mt-1"
+                              numberOfLines={1}
+                              ellipsizeMode="tail"
+                              style={{ maxWidth: 240 }}
+                            >
+                              Reporter:{" "}
+                              {reporterShort(r.reporterId || r.boatId)}
+                            </Text>
                           </View>
 
                           {(r.status || "").toLowerCase() !== "resolved" && (
@@ -1002,7 +1111,7 @@ export default function PoliceDashboard() {
                           )}
                         </View>
                       </View>
-                    ))
+                    )) 
                   )}
                 </View>
               </View>
@@ -1092,7 +1201,9 @@ export default function PoliceDashboard() {
                           setSosUiStatus((s) => ({
                             ...s,
                             [focusedBoat.boatId]: "active",
-                            ...(focusedBoat.alertId ? { [focusedBoat.alertId]: "active" } : {}),
+                            ...(focusedBoat.alertId
+                              ? { [focusedBoat.alertId]: "active" }
+                              : {}),
                           }))
                         }
                       >
