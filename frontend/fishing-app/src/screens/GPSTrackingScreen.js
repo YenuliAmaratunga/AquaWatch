@@ -365,23 +365,19 @@ export default function GPSTrackingScreen({ navigation }) {
 
   return (
     <SafeAreaView className="flex-1 bg-white" style={{ paddingTop: 6 }}>
-      <ScrollView 
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 20 }}
-      >
-        {/* Header */}
-        <View className="px-4 pb-2 items-center">
-          <Text className="text-[20px] font-extrabold text-blue text-center">
-            Report Center
-          </Text>
-          <Text className="text-[12px] text-[#6E8CFB99] text-center mt-0.5">
-            SOS • New Report • My Reports
-          </Text>
+      {/* Header */}
+      <View className="px-4 pb-2 items-center">
+        <Text className="text-[20px] font-extrabold text-blue text-center">
+          Report Center
+        </Text>
+        <Text className="text-[12px] text-[#6E8CFB99] text-center mt-0.5">
+          SOS • New Report • My Reports
+        </Text>
 
-          <View className="bg-lightPurple/80 rounded-full px-3 py-1 mt-2">
-            <Text className="text-blue text-[11px] font-semibold">Live</Text>
-          </View>
+        <View className="bg-lightPurple/80 rounded-full px-3 py-1 mt-2">
+          <Text className="text-blue text-[11px] font-semibold">Live</Text>
         </View>
+      </View>
       {/* Notice banner (success / error) */}
       {notice && (
         <Animated.View
@@ -625,45 +621,6 @@ export default function GPSTrackingScreen({ navigation }) {
 
         <View className="h-6" />
       </View>
-
-      <Modal transparent visible={sending} animationType="fade">
-        <View
-          style={{
-            flex: 1,
-            backgroundColor: "rgba(0,0,0,0.35)",
-            justifyContent: "center",
-            alignItems: "center",
-          }}
-        >
-          <View
-            style={{
-              backgroundColor: "#fff",
-              borderRadius: 16,
-              paddingVertical: 16,
-              paddingHorizontal: 18,
-              width: Math.min(width - 64, 360),
-              alignItems: "center",
-            }}
-          >
-            <ActivityIndicator size="large" color="#DC2626" />
-            <Text
-              style={{ marginTop: 10, fontWeight: "800", color: "#1F2937" }}
-            >
-              Sending SOS…
-            </Text>
-            <Text
-              style={{
-                marginTop: 4,
-                fontSize: 12,
-                color: "#6B7280",
-                textAlign: "center",
-              }}
-            >
-              Contacting Marine Police and sharing your location.
-            </Text>
-          </View>
-        </View>
-      </Modal>
 
       {/* SOS Confirmation & Arming Modal */}
       <Modal
