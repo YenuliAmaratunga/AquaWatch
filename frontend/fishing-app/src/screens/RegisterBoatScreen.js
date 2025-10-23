@@ -123,11 +123,58 @@ const pickLicense = async () => {
   }
 };
 
+const removeImage = (uri) => {
+  setImages((prev) => prev.filter((img) => img !== uri));
+};
+
   // 📨 Submit form
   const handleSubmit = async () => {
     try {
+      // Validation
+      if (!boatName.trim()) {
+        Alert.alert("Validation Error", "Please enter boat name");
+        return;
+      }
+      if (!registrationNumber.trim()) {
+        Alert.alert("Validation Error", "Please enter registration number");
+        return;
+      }
+      if (!boatType) {
+        Alert.alert("Validation Error", "Please select boat type");
+        return;
+      }
+      if (!length || isNaN(length)) {
+        Alert.alert("Validation Error", "Please enter valid boat length");
+        return;
+      }
+      if (!capacity || isNaN(capacity)) {
+        Alert.alert("Validation Error", "Please enter valid capacity");
+        return;
+      }
+      if (!engineType) {
+        Alert.alert("Validation Error", "Please select engine type");
+        return;
+      }
+      if (!homePort) {
+        Alert.alert("Validation Error", "Please select home port");
+        return;
+      }
+      if (!insuranceNumber.trim()) {
+        Alert.alert("Validation Error", "Please enter insurance number");
+        return;
+      }
+      if (images.length === 0) {
+        Alert.alert("Validation Error", "Please upload at least one boat image");
+        return;
+      }
+      if (!license) {
+        Alert.alert("Validation Error", "Please upload license image");
+        return;
+      }
+
       if (!token || !userId) {
-        Alert.alert("Error", "User not authenticated");
+        Alert.alert("Error", "User not authenticated. Please login again.");
+        navigation.navigate("Login");
         return;
       }
 
@@ -174,8 +221,21 @@ const pickLicense = async () => {
         },
       ]);
     } catch (err) {
-      console.log("Registration error:", err);
-      Alert.alert("Error", "Failed to register boat.");
+      console.error("Registration error:", err);
+      let errorMessage = "Failed to register boat.";
+      
+      if (err.response) {
+        // Server responded with error
+        errorMessage = err.response.data?.message || err.response.data?.error || errorMessage;
+      } else if (err.request) {
+        // Request made but no response
+        errorMessage = "No response from server. Please check your internet connection.";
+      } else {
+        // Error in request setup
+        errorMessage = err.message || errorMessage;
+      }
+      
+      Alert.alert("Error", errorMessage);
     } finally {
       setLoading(false);
     }

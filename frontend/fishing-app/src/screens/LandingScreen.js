@@ -1,5 +1,12 @@
 import React, { useState } from "react";
-import { SafeAreaView, View, Text, TouchableOpacity, Image, ScrollView } from "react-native";
+import {
+  SafeAreaView,
+  View,
+  Text,
+  TouchableOpacity,
+  Image,
+  ScrollView,
+} from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 
 export default function LandingScreen({ navigation }) {
@@ -11,17 +18,8 @@ export default function LandingScreen({ navigation }) {
     ta: { register: "பதிவு", login: "உள்நுழையவும்" },
   };
 
-  // Native language labels for selector buttons
-  const langLabelsNative = {
-    en: "EN",
-    si: "සිං",
-    ta: "த",
-  };
-
-  // Ensure fallback if language key is missing
   const currentLabels = labels[language] || labels.en;
 
-  // Gradient Button component
   const GradientButton = ({ text, colors, onPress }) => (
     <TouchableOpacity
       activeOpacity={0.9}
@@ -48,7 +46,7 @@ export default function LandingScreen({ navigation }) {
         }}
       >
         <Text style={{ color: "#fff", fontSize: 16, fontWeight: "600" }}>
-          {text ?? ""}
+          {text || "Button"}
         </Text>
       </LinearGradient>
     </TouchableOpacity>
@@ -70,57 +68,26 @@ export default function LandingScreen({ navigation }) {
           }}
           showsVerticalScrollIndicator={false}
         >
-          {/* App Logo */}
+          {/* ✅ App Logo - Make sure path exists */}
           <Image
             source={require("../assets/CircularAppLogo.png")}
             style={{ width: 192, height: 192, marginBottom: 64 }}
             resizeMode="contain"
           />
 
-          {/* Register & Login Buttons */}
+          {/* ✅ Register & Login Buttons */}
           <View style={{ width: "100%", marginBottom: 24 }}>
             <GradientButton
               text={currentLabels.register}
               colors={["#50589C", "#6E8CFB"]}
               onPress={() => navigation.navigate("Register", { language })}
             />
-            <View style={{ height: 32 }} /> {/* spacing between buttons */}
+            <View style={{ height: 32 }} />
             <GradientButton
               text={currentLabels.login}
               colors={["#6E8CFB", "#BABCFF"]}
               onPress={() => navigation.navigate("Login", { language })}
             />
-          </View>
-
-          {/* Language Selector */}
-          <View style={{ flexDirection: "row", marginTop: 48 }}>
-            {["en", "si", "ta"].map((lang, idx) => (
-              <TouchableOpacity
-                key={lang}
-                onPress={() => setLanguage(lang)}
-                style={{
-                  paddingVertical: 8,
-                  paddingHorizontal: 16,
-                  borderWidth: 1,
-                  borderColor: "#ccc",
-                  backgroundColor: language === lang ? "#000435" : "#fff",
-                  borderTopLeftRadius: idx === 0 ? 8 : 0,
-                  borderBottomLeftRadius: idx === 0 ? 8 : 0,
-                  borderTopRightRadius: idx === 2 ? 8 : 0,
-                  borderBottomRightRadius: idx === 2 ? 8 : 0,
-                  marginLeft: idx !== 0 ? -1 : 0,
-                }}
-              >
-                <Text
-                  style={{
-                    color: language === lang ? "#fff" : "#000",
-                    fontWeight: "600",
-                  }}
-                >
-                  {langLabelsNative[lang]}
-                </Text>
-              </TouchableOpacity>
-            ))}
           </View>
         </ScrollView>
       </SafeAreaView>

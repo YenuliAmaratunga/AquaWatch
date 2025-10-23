@@ -11,6 +11,7 @@ import {
   Platform,
   Modal,
   Vibration,
+  ScrollView,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
@@ -364,19 +365,23 @@ export default function GPSTrackingScreen({ navigation }) {
 
   return (
     <SafeAreaView className="flex-1 bg-white" style={{ paddingTop: 6 }}>
-      {/* Header */}
-      <View className="px-4 pb-2 items-center">
-        <Text className="text-[20px] font-extrabold text-blue text-center">
-          Report Center
-        </Text>
-        <Text className="text-[12px] text-[#6E8CFB99] text-center mt-0.5">
-          SOS • New Report • My Reports
-        </Text>
+      <ScrollView 
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 20 }}
+      >
+        {/* Header */}
+        <View className="px-4 pb-2 items-center">
+          <Text className="text-[20px] font-extrabold text-blue text-center">
+            Report Center
+          </Text>
+          <Text className="text-[12px] text-[#6E8CFB99] text-center mt-0.5">
+            SOS • New Report • My Reports
+          </Text>
 
-        <View className="bg-lightPurple/80 rounded-full px-3 py-1 mt-2">
-          <Text className="text-blue text-[11px] font-semibold">Live</Text>
+          <View className="bg-lightPurple/80 rounded-full px-3 py-1 mt-2">
+            <Text className="text-blue text-[11px] font-semibold">Live</Text>
+          </View>
         </View>
-      </View>
       {/* Notice banner (success / error) */}
       {notice && (
         <Animated.View
@@ -602,6 +607,7 @@ export default function GPSTrackingScreen({ navigation }) {
 
         <View className="h-6" />
       </View>
+      </ScrollView>
       {/* SOS Confirmation & Arming Modal */}
       <Modal
         transparent

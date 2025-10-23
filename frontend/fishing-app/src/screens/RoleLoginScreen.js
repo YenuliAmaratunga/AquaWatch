@@ -43,7 +43,12 @@ export default function RoleLoginScreen() {
 
   const handleSubmit = async () => {
     if (!phone || !password) {
-      Alert.alert("Error", "Please fill all fields");
+      Alert.alert("Validation Error", "Please fill all fields");
+      return;
+    }
+
+    if (phone.length < 10) {
+      Alert.alert("Invalid Phone", "Please enter a valid phone number");
       return;
     }
 
@@ -69,11 +74,28 @@ export default function RoleLoginScreen() {
           navigation.reset({ index: 0, routes: [{ name: "PoliceDashboard" }] });
         } 
       } else {
-        Alert.alert("Error", message || "Login failed");
+        Alert.alert("Login Failed", message || "Invalid credentials");
       }
     } catch (error) {
-      console.error(error);
-      Alert.alert("Error", "Something went wrong");
+      console.error("Login error:", error);
+      
+      let errorMessage = "Something went wrong. Please try again.";
+      
+      if (error.response) {
+        // Server responded with error
+        if (error.response.status === 401) {
+          errorMessage = "Invalid phone number or password";
+        } else if (error.response.status === 404) {
+          errorMessage = "User not found. Please check your phone number";
+        } else if (error.response.data?.message) {
+          errorMessage = error.response.data.message;
+        }
+      } else if (error.request) {
+        // No response from server
+        errorMessage = "Cannot connect to server. Check your internet connection.";
+      }
+      
+      Alert.alert("Login Error", errorMessage);
     }
   };
 

@@ -4,7 +4,6 @@ import {
   Text,
   ScrollView,
   TouchableOpacity,
-  ActivityIndicator,
   Animated,
   StyleSheet,
   Dimensions,
@@ -12,121 +11,163 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Animatable from "react-native-animatable";
-import axios from "axios";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import {
-  calculateOverallRisk,
-  calculateWeatherRisk,
-  getRiskLevel,
-  getTripRecommendation,
-  getRiskBreakdown,
-  generateSafetyRecommendations,
-} from "../utils/riskCalculator";
 
 const { width } = Dimensions.get("window");
 
-const AUTH_BASE =
-  "https://10b8c329-d78f-4b7f-8cd9-448ba1dae2e2-dev.e1-us-east-azure.choreoapis.dev/aquawatchapp/registration-service/v1.0";
-const WEATHER_BASE =
-  "https://2b55f8fb-4fda-40b3-9a62-9282bf78e6c0-dev.e1-us-east-azure.choreoapis.dev/aquawatch/weather-service/v1.0";
+// STATIC HARDCODED DATA - No API calls
+const STATIC_BOAT_DATA = {
+  boatName: "Sea Explorer",
+  registrationNumber: "SL-BOAT-2024-001",
+  boatType: "Fishing Vessel",
+  capacity: 8,
+  boatAge: 3,
+  engineStatus: "Good",
+};
+
+const STATIC_RISK_FACTORS = {
+  boatAge: 3,
+  fuelAmount: 70,
+  fuelEfficiency: 4.0,
+  crewCount: 5,
+  lifeJacketsCount: 8,
+  engineStatus: "Good",
+  weatherCondition: "Fair",
+  distanceKm: 45,
+  pastViolations: 0,
+};
+
+const STATIC_RISK_SCORE = 28; // Low risk (hardcoded)
+
+const getRiskLevel = (score) => {
+  if (score < 30) {
+    return {
+      level: "LOW",
+      emoji: "✅",
+      color: "#10B981",
+    };
+  } else if (score < 60) {
+    return {
+      level: "MEDIUM",
+      emoji: "⚠️",
+      color: "#F59E0B",
+    };
+  } else {
+    return {
+      level: "HIGH",
+      emoji: "❌",
+      color: "#EF4444",
+    };
+  }
+};
+
+const getTripRecommendation = (score) => {
+  if (score < 30) {
+    return {
+      decision: "TRIP APPROVED ✓",
+      message: "All safety parameters are within acceptable limits. Safe travels!",
+      icon: "checkmark-circle",
+      color: "#10B981",
+    };
+  } else if (score < 60) {
+    return {
+      decision: "CAUTION ADVISED",
+      message: "Some risk factors detected. Proceed with extra caution.",
+      icon: "warning",
+      color: "#F59E0B",
+    };
+  } else {
+    return {
+      decision: "TRIP NOT RECOMMENDED",
+      message: "High risk conditions detected. Consider postponing this trip.",
+      icon: "close-circle",
+      color: "#EF4444",
+    };
+  }
+};
+
+const STATIC_RISK_BREAKDOWN = [
+  {
+    icon: "calendar",
+    factor: "Boat Age",
+    value: "3 years",
+    status: "safe",
+    message: "Boat is relatively new and well-maintained",
+  },
+  {
+    icon: "water",
+    factor: "Fuel Status",
+    value: "70 liters (Sufficient)",
+    status: "safe",
+    message: "Adequate fuel for planned distance of 45 km",
+  },
+  {
+    icon: "shield-checkmark",
+    factor: "Safety Equipment",
+    value: "8/5 life jackets",
+    status: "safe",
+    message: "Sufficient life jackets for all crew members",
+  },
+  {
+    icon: "construct",
+    factor: "Engine Condition",
+    value: "Good",
+    status: "safe",
+    message: "Engine is in good working condition",
+  },
+  {
+    icon: "partly-sunny",
+    factor: "Weather Conditions",
+    value: "Fair",
+    status: "safe",
+    message: "Weather conditions are favorable for fishing",
+  },
+  {
+    icon: "navigate",
+    factor: "Trip Distance",
+    value: "45 km",
+    status: "safe",
+    message: "Distance is manageable with current fuel",
+  },
+];
+
+const STATIC_RECOMMENDATIONS = [
+  {
+    priority: "LOW",
+    action: "Ensure regular maintenance schedule is followed",
+  },
+  {
+    priority: "LOW",
+    action: "Check weather updates before departure",
+  },
+  {
+    priority: "LOW",
+    action: "Verify all communication devices are working",
+  },
+  {
+    priority: "MEDIUM",
+    action: "Carry extra fuel for emergency situations",
+  },
+];
 
 export default function RiskAssessmentDashboard({ navigation }) {
-  const [loading, setLoading] = useState(true);
-  const [boats, setBoats] = useState([]);
-  const [selectedBoat, setSelectedBoat] = useState(null);
-  const [weatherData, setWeatherData] = useState(null);
-  const [riskScore, setRiskScore] = useState(0);
+  const [riskScore] = useState(STATIC_RISK_SCORE);
   const [riskAnimation] = useState(new Animated.Value(0));
   const [showDetails, setShowDetails] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchUserBoats();
-  }, []);
-
-  useEffect(() => {
-    if (riskScore > 0) {
+    // Simulate loading
+    const timer = setTimeout(() => {
+      setLoading(false);
       Animated.timing(riskAnimation, {
         toValue: riskScore,
         duration: 1500,
         useNativeDriver: false,
       }).start();
-    }
-  }, [riskScore]);
+    }, 800);
 
-  const fetchUserBoats = async () => {
-    try {
-      const auth = await AsyncStorage.getItem("authData");
-      if (!auth) {
-        setLoading(false);
-        return;
-      }
-
-      const parsed = JSON.parse(auth);
-      const res = await axios.get(
-        `${AUTH_BASE}/api/Boat/viewBoatRegRequestsMade/${parsed.userId}`
-      );
-
-      if (Array.isArray(res.data) && res.data.length > 0) {
-        setBoats(res.data);
-        // Auto-select first boat for demo
-        analyzeBoat(res.data[0]);
-      }
-    } catch (error) {
-      console.error("Error fetching boats:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const analyzeBoat = async (boat) => {
-    setSelectedBoat(boat);
-    setLoading(true);
-
-    try {
-      // Fetch weather data for home port (using dummy coordinates for demo)
-      const lat = 6.9271; // Colombo, Sri Lanka
-      const lon = 79.8612;
-
-      const weatherRes = await axios.get(
-        `${WEATHER_BASE}/api/weather/forecast?lat=${lat}&lon=${lon}`
-      );
-
-      if (weatherRes.data.success) {
-        setWeatherData(weatherRes.data.data);
-        calculateRisk(boat, weatherRes.data.data);
-      }
-    } catch (error) {
-      console.error("Error fetching weather:", error);
-      // Calculate risk without weather data
-      calculateRisk(boat, null);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const calculateRisk = (boat, weather) => {
-    // Calculate boat age (assuming registration date is creation date)
-    const boatAge = boat.createdAt
-      ? new Date().getFullYear() - new Date(boat.createdAt).getFullYear()
-      : 5; // Default 5 years if no date
-
-    const weatherRisk = calculateWeatherRisk(weather);
-
-    const factors = {
-      boatAge: boatAge,
-      fuelAmount: 60, // Demo value
-      fuelEfficiency: 3.5, // Demo value
-      crewCount: 4, // Demo value
-      lifeJacketsCount: 4, // Demo value
-      engineStatus: "Good", // From boat data if available
-      weatherRisk: weatherRisk,
-      distanceKm: 50, // Demo value for typical fishing trip
-      pastViolations: 0, // Could be fetched from backend
-    };
-
-    const score = calculateOverallRisk(factors);
-    setRiskScore(score);
-  };
+    return () => clearTimeout(timer);
+  }, []);
 
   const RiskGauge = ({ score }) => {
     const riskLevel = getRiskLevel(score);
@@ -193,34 +234,11 @@ export default function RiskAssessmentDashboard({ navigation }) {
           <Ionicons name="analytics" size={70} color="#636CCB" />
         </Animatable.View>
         <Text style={styles.loadingText}>Analyzing Safety Data...</Text>
-        <ActivityIndicator size="large" color="#636CCB" style={{ marginTop: 20 }} />
-      </View>
-    );
-  }
-
-  if (!selectedBoat) {
-    return (
-      <View style={styles.loadingContainer}>
-        <Ionicons name="boat-outline" size={70} color="#636CCB" />
-        <Text style={styles.loadingText}>No boats found</Text>
-        <Text style={styles.subText}>Register a boat to see risk assessment</Text>
       </View>
     );
   }
 
   const recommendation = getTripRecommendation(riskScore);
-  const riskBreakdown = getRiskBreakdown({
-    boatAge: new Date().getFullYear() - new Date(selectedBoat.createdAt).getFullYear(),
-    fuelAmount: 60,
-    fuelEfficiency: 3.5,
-    crewCount: 4,
-    lifeJacketsCount: 4,
-    engineStatus: "Good",
-    weatherRisk: calculateWeatherRisk(weatherData),
-    distanceKm: 50,
-    pastViolations: 0,
-  });
-  const recommendations = generateSafetyRecommendations(riskBreakdown);
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
@@ -234,7 +252,7 @@ export default function RiskAssessmentDashboard({ navigation }) {
         <Animatable.View animation="fadeInDown">
           <Text style={styles.headerTitle}>AI Risk Assessment</Text>
           <Text style={styles.headerSubtitle}>
-            Real-time safety analysis for {selectedBoat.boatName}
+            Real-time safety analysis for {STATIC_BOAT_DATA.boatName}
           </Text>
         </Animatable.View>
       </LinearGradient>
@@ -261,22 +279,22 @@ export default function RiskAssessmentDashboard({ navigation }) {
         <View style={styles.infoRow}>
           <Ionicons name="boat" size={20} color="#636CCB" />
           <Text style={styles.infoLabel}>Boat:</Text>
-          <Text style={styles.infoValue}>{selectedBoat.boatName}</Text>
+          <Text style={styles.infoValue}>{STATIC_BOAT_DATA.boatName}</Text>
         </View>
         <View style={styles.infoRow}>
           <Ionicons name="document-text" size={20} color="#636CCB" />
           <Text style={styles.infoLabel}>Registration:</Text>
-          <Text style={styles.infoValue}>{selectedBoat.registrationNumber}</Text>
+          <Text style={styles.infoValue}>{STATIC_BOAT_DATA.registrationNumber}</Text>
         </View>
         <View style={styles.infoRow}>
           <Ionicons name="resize" size={20} color="#636CCB" />
           <Text style={styles.infoLabel}>Type:</Text>
-          <Text style={styles.infoValue}>{selectedBoat.boatType}</Text>
+          <Text style={styles.infoValue}>{STATIC_BOAT_DATA.boatType}</Text>
         </View>
         <View style={styles.infoRow}>
           <Ionicons name="people" size={20} color="#636CCB" />
           <Text style={styles.infoLabel}>Capacity:</Text>
-          <Text style={styles.infoValue}>{selectedBoat.capacity} persons</Text>
+          <Text style={styles.infoValue}>{STATIC_BOAT_DATA.capacity} persons</Text>
         </View>
       </View>
 
@@ -299,14 +317,14 @@ export default function RiskAssessmentDashboard({ navigation }) {
       {showDetails && (
         <Animatable.View animation="fadeInUp">
           <Text style={styles.sectionTitle}>Risk Factor Breakdown</Text>
-          {riskBreakdown.map((item, index) => (
+          {STATIC_RISK_BREAKDOWN.map((item, index) => (
             <RiskFactorCard key={index} {...item} />
           ))}
 
           {/* Safety Recommendations */}
           <Text style={styles.sectionTitle}>Safety Recommendations</Text>
           <View style={styles.recommendationsContainer}>
-            {recommendations.map((rec, index) => (
+            {STATIC_RECOMMENDATIONS.map((rec, index) => (
               <Animatable.View
                 key={index}
                 animation="fadeInLeft"
@@ -368,14 +386,13 @@ export default function RiskAssessmentDashboard({ navigation }) {
         </TouchableOpacity>
       </View>
 
-      {/* Refresh Button */}
-      <TouchableOpacity
-        style={styles.refreshButton}
-        onPress={() => analyzeBoat(selectedBoat)}
-      >
-        <Ionicons name="refresh" size={20} color="#636CCB" />
-        <Text style={styles.refreshButtonText}>Refresh Analysis</Text>
-      </TouchableOpacity>
+      {/* Info Note */}
+      <View style={styles.infoNote}>
+        <Ionicons name="information-circle" size={20} color="#636CCB" />
+        <Text style={styles.infoNoteText}>
+          This is a demonstration with static data. In production, this would use real-time boat and weather data.
+        </Text>
+      </View>
 
       <View style={{ height: 40 }} />
     </ScrollView>
@@ -398,11 +415,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#636CCB",
     marginTop: 20,
-  },
-  subText: {
-    fontSize: 14,
-    color: "#6B7280",
-    marginTop: 8,
   },
   header: {
     paddingTop: 60,
@@ -646,23 +658,21 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     marginLeft: 10,
   },
-  refreshButton: {
+  infoNote: {
     flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
+    backgroundColor: "#EEF2FF",
     marginHorizontal: 20,
     marginTop: 20,
-    padding: 12,
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: "#636CCB",
-    backgroundColor: "#fff",
+    padding: 16,
+    borderRadius: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: "#636CCB",
   },
-  refreshButtonText: {
-    color: "#636CCB",
-    fontSize: 14,
-    fontWeight: "700",
-    marginLeft: 8,
+  infoNoteText: {
+    flex: 1,
+    fontSize: 12,
+    color: "#4338CA",
+    marginLeft: 10,
+    lineHeight: 18,
   },
 });
-

@@ -281,7 +281,8 @@ export default function TripRegistrationScreen() {
 
   // ---------------- UI ----------------
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }}>
+    <View style={styles.container}>
+      <ScrollView contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
       <Text style={styles.title}>Trip Registration</Text>
 
       {/* Boat selection */}
@@ -516,12 +517,13 @@ export default function TripRegistrationScreen() {
         onClose={() => setAlertData({ ...alertData, visible: false })}
       />
     </ScrollView>
+    </View>
   );
 }
 
 // ---------------- Styles ----------------
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f8f9fa", paddingTop: 50 },
+  container: { flex: 1, backgroundColor: "#f8f9fa" },
   title: {
     fontSize: 22,
     fontWeight: "bold",
